@@ -633,7 +633,7 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
       )}
       {meta && status === 'ready' && (
         <div style={{ fontSize: '0.75rem', color: '#888', marginTop: 4 }}>
-          เลือก 📏 Length หรือ 📐 Angle จาก toolbar แล้วลากบนภาพ — ผลแสดงเป็น mm จาก PixelSpacing tag · ลากซ้าย = active tool · กลาง = pan · ขวา = zoom
+          เลือก 📏 Length หรือ 📐 Angle จาก toolbar แล้วลากบนภาพ — ผลแสดงเป็น mm จาก PixelSpacing tag. ลากซ้าย = active tool, กลาง = pan, ขวา = zoom.
         </div>
       )}
     </div>

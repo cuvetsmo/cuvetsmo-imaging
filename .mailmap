@@ -1,0 +1,6 @@
+# Map Co-Authored-By Claude trailers back to Palm so GitHub Contributors
+# graph shows only the human authors.
+#
+# Format: <canonical name> <canonical-email> <ANY-name> <commit-email>
+Palm Zamak <palmzamak2547@gmail.com> Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+Palm Zamak <palmzamak2547@gmail.com> palmzamak2547 <palmzamak2547@gmail.com>
