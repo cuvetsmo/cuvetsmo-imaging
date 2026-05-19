@@ -51,12 +51,27 @@ export function SiteHeader() {
  */
 export function SiteFooter() {
   return (
-    <footer className="border-t border-[var(--color-border)] bg-[var(--color-surface-2)] mt-auto">
-      <div className="mx-auto max-w-6xl px-4 py-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-[var(--color-text-muted)]">
-        <div className="flex items-center gap-2">
-          <Image src="/smo-logo.png" alt="" width={20} height={20} className="rounded opacity-80" />
+    <footer className="relative border-t border-[var(--color-border)] bg-[var(--color-surface-2)] mt-auto overflow-hidden">
+      {/* Imaging eye mark watermark fades into the right edge */}
+      <Image
+        src="/imaging-logo-mark.png"
+        alt=""
+        aria-hidden
+        width={300}
+        height={300}
+        className="pointer-events-none select-none absolute -right-16 -bottom-16 opacity-[0.06]"
+      />
+      <div className="relative mx-auto max-w-6xl px-4 py-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-[var(--color-text-muted)]">
+        <div className="flex items-center gap-2.5">
+          <Image
+            src="/imaging-logo-mark.png"
+            alt="CUVETSMO Imaging"
+            width={22}
+            height={22}
+            className="rounded-sm"
+          />
           <span>
-            Part of{" "}
+            CUVETSMO Imaging, part of{" "}
             <a
               href="https://labs.cuvetsmo.com"
               className="text-[var(--color-tool-cyan)] hover:text-[#7DDCEF] underline underline-offset-2"

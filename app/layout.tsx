@@ -23,12 +23,12 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL("https://imaging.cuvetsmo.com"),
   title: {
-    default: "Imaging Lab — DICOM viewer + AI overlays for vet students",
-    template: "%s — Imaging Lab",
+    default: "CUVETSMO Imaging — DICOM viewer + AI overlays for vet students",
+    template: "%s — CUVETSMO Imaging",
   },
   description:
-    "DICOM viewer + AI overlays for vet students. Norberg angle, VHS, image occlusion, runs entirely in browser. By CUVETSMO Labs.",
-  applicationName: "Imaging Lab",
+    "CUVETSMO Imaging Lab — DICOM viewer with AI overlays for vet students at Chulalongkorn. Norberg angle, VHS, image occlusion, all in browser. Part of CUVETSMO Labs.",
+  applicationName: "CUVETSMO Imaging",
   keywords: [
     "imaging lab",
     "dicom viewer",
@@ -51,31 +51,74 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
   },
   openGraph: {
-    title: "Imaging Lab — DICOM viewer + AI overlays for vet students",
+    title: "CUVETSMO Imaging — DICOM viewer + AI overlays for vet students",
     description:
-      "DICOM viewer, Norberg angle, VHS, image occlusion — all in browser. By Chula Vet students.",
+      "CUVETSMO Imaging Lab — DICOM viewer, Norberg angle, VHS, image occlusion, all in browser. By Chula Vet students.",
     type: "website",
     locale: "th_TH",
     alternateLocale: ["en_US"],
-    siteName: "Imaging Lab",
+    siteName: "CUVETSMO Imaging",
     url: "https://imaging.cuvetsmo.com",
     images: [
       {
         url: "/og.png",
         width: 1200,
         height: 630,
-        alt: "Imaging Lab — DICOM + AI overlays for vet students",
+        alt: "CUVETSMO Imaging — DICOM + AI overlays for vet students",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Imaging Lab — DICOM viewer + AI overlays for vet students",
-    description: "DICOM viewer, Norberg angle, VHS, image occlusion — all in browser.",
+    title: "CUVETSMO Imaging — DICOM viewer + AI overlays for vet students",
+    description: "CUVETSMO Imaging Lab — DICOM viewer, Norberg angle, VHS, image occlusion, all in browser.",
     images: ["/og.png"],
   },
   robots: { index: true, follow: true },
   alternates: { canonical: "https://imaging.cuvetsmo.com" },
+};
+
+// Organization schema teaches Google that imaging.cuvetsmo.com is a
+// sub-organization of CUVETSMO. The bare-word search "cuvetsmo"
+// should pick us up via alternateName + parentOrganization links.
+const organizationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "@id": "https://imaging.cuvetsmo.com/#org",
+  name: "CUVETSMO Imaging",
+  alternateName: [
+    "CUVETSMO Imaging",
+    "cuvetsmo imaging",
+    "Imaging Lab CUVETSMO",
+    "imaging.cuvetsmo.com",
+    "DICOM Viewer CUVETSMO",
+    "Norberg Angle Tool CUVETSMO",
+    "VHS Score Tool CUVETSMO",
+    "CUVETSMO",
+    "cuvetsmo",
+  ],
+  url: "https://imaging.cuvetsmo.com/",
+  logo: "https://imaging.cuvetsmo.com/imaging-logo.png",
+  image: "https://imaging.cuvetsmo.com/og.png",
+  description:
+    "DICOM viewer with AI overlays for veterinary students at Chulalongkorn University. Norberg angle, VHS score, image occlusion, runs entirely in browser.",
+  parentOrganization: {
+    "@type": "Organization",
+    "@id": "https://cuvetsmo.com/#smo",
+    name: "CUVETSMO",
+    url: "https://cuvetsmo.com/",
+  },
+};
+
+const websiteJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "@id": "https://imaging.cuvetsmo.com/#website",
+  name: "CUVETSMO Imaging",
+  alternateName: ["cuvetsmo imaging", "Imaging Lab CUVETSMO"],
+  url: "https://imaging.cuvetsmo.com/",
+  inLanguage: ["th", "en"],
+  publisher: { "@id": "https://imaging.cuvetsmo.com/#org" },
 };
 
 export default function RootLayout({
@@ -85,6 +128,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="th" className={`${ibmPlexSansThai.variable} ${inter.variable} h-full antialiased`}>
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+        />
+      </head>
       <body className="min-h-full flex flex-col bg-[var(--color-bg)] text-[var(--color-text)]">
         <SiteHeader />
         <main className="flex-1 w-full">{children}</main>
