@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { IBM_Plex_Sans_Thai, Inter } from "next/font/google";
 import "./globals.css";
 import { SiteHeader, SiteFooter } from "@/components/Brand";
+import { EcosystemBar } from "@/components/EcosystemBar";
 
 const ibmPlexSansThai = IBM_Plex_Sans_Thai({
   variable: "--font-ibm-plex-sans-thai",
@@ -139,6 +140,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-[var(--color-bg)] text-[var(--color-text)]">
+        <EcosystemBar current="imaging" />
         <SiteHeader />
         <main className="flex-1 w-full">{children}</main>
         <SiteFooter />
