@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans_Thai } from "next/font/google";
+import { IBM_Plex_Sans_Thai, Inter } from "next/font/google";
 import "./globals.css";
 import { SiteHeader, SiteFooter } from "@/components/Brand";
 
@@ -7,6 +7,16 @@ const ibmPlexSansThai = IBM_Plex_Sans_Thai({
   variable: "--font-ibm-plex-sans-thai",
   subsets: ["thai", "latin"],
   weight: ["300", "400", "500", "600", "700"],
+  display: "swap",
+});
+
+// Inter — clinical UI workhorse. Industry default for medical software,
+// broad numeric weights for DICOM metadata. No display font swap; the page
+// IS the tool (see projects/cuvetsmo-labs/01-visual-theme-directions.md).
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -74,8 +84,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="th" className={`${ibmPlexSansThai.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-stone-50 text-stone-900">
+    <html lang="th" className={`${ibmPlexSansThai.variable} ${inter.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col bg-[var(--color-bg)] text-[var(--color-text)]">
         <SiteHeader />
         <main className="flex-1 w-full">{children}</main>
         <SiteFooter />

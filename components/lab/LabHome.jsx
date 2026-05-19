@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect, Suspense, lazy } from 'react';
 import Link from 'next/link';
 import { useMediaQuery } from '../../lib/dicom/use-media-query.js';
+import { CrosshairPattern } from '../CrosshairPattern';
 
 const DicomViewport = lazy(() => import('./DicomViewport.jsx'));
 const TagInspector = lazy(() => import('./TagInspector.jsx'));
@@ -82,7 +83,7 @@ export default function LabHome() {
     const skippedExtras = fileList.length > MAX_FILES ? fileList.length - MAX_FILES : 0;
     let msg = null;
     if (bad.length > 0) msg = `บางไฟล์ไม่ใช่ DICOM (ข้าม): ${bad.join(', ')}`;
-    if (skippedExtras > 0) msg = `${msg ? msg + ' · ' : ''}ตอนนี้รองรับสูงสุด ${MAX_FILES} ไฟล์ (ข้าม ${skippedExtras})`;
+    if (skippedExtras > 0) msg = `${msg ? msg + ' — ' : ''}ตอนนี้รองรับสูงสุด ${MAX_FILES} ไฟล์ (ข้าม ${skippedExtras})`;
     setError(msg);
     setFiles(validated);
   }, [addToRecent]);
@@ -131,10 +132,10 @@ export default function LabHome() {
   if (files.length > 0) {
     return (
       <div className="mx-auto max-w-7xl px-3 sm:px-5 py-4">
-        <div style={viewerHeaderStyle}>
-          <div style={{ fontSize: '0.88rem', color: '#555' }}>
-            📄 {files.length === 1
-              ? `${firstFile.name} · ${(firstFile.size / 1024).toFixed(0)} KB`
+        <div className="flex justify-between items-center mb-3 gap-2 flex-wrap">
+          <div className="text-sm text-[var(--color-text-muted)] font-mono">
+            {files.length === 1
+              ? `${firstFile.name} — ${(firstFile.size / 1024).toFixed(0)} KB`
               : `Study (${files.length} views): ${files.map(f => f.name).join(' + ')}`}
           </div>
           <button onClick={reset} className="vmx-btn vmx-btn-ghost vmx-btn-sm">← Back to drop zone</button>
@@ -155,122 +156,172 @@ export default function LabHome() {
     );
   }
 
-  // ── HOME / DROP ZONE ──
+  // ── HOME / WORKSPACE (no marketing hero — the page IS the tool) ──
   return (
-    <div className="mx-auto max-w-5xl px-4 sm:px-6 py-8">
-      {/* HERO */}
-      <section className="text-center mb-8">
-        <div className="text-4xl mb-3" aria-hidden>🔬</div>
-        <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-stone-900">
-          Imaging Lab
-        </h1>
-        <p className="mt-3 text-stone-600 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
-          DICOM viewer + AI overlays สำหรับนิสิตคลินิก ·{" "}
-          <span className="text-stone-500">Norberg angle · VHS · Image Occlusion</span>
-        </p>
-        <p className="mt-2 text-xs text-stone-500">
-          ⚠️ Educational tool. Not for clinical decisions.
-        </p>
-      </section>
+    <div className="relative">
+      {/* Faint DICOM crosshair grid wash behind the workspace */}
+      <CrosshairPattern className="z-0" opacity={0.035} />
 
-      {/* Mode picker */}
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-        <ModeCard
-          href="/cases"
-          icon="📚"
-          title="Case Library"
-          desc="ดู curated cases — X-ray / CT / MRI / US"
-        />
+      <div className="relative z-10 mx-auto max-w-5xl px-4 sm:px-6 pt-6 pb-10">
+        {/* Compact header strip — no hero, just a workspace title bar */}
+        <div className="flex items-baseline justify-between mb-5 flex-wrap gap-2">
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight text-[var(--color-text)]">
+              Free Mode
+            </h1>
+            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+              Drag DICOM onto the dropzone, ครั้งละ {MAX_FILES} ไฟล์, render ในเบราว์เซอร์ล้วน
+            </p>
+          </div>
+          <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-muted)]">
+            Educational, not for clinical decisions
+          </span>
+        </div>
+
+        {/* PRIMARY: Free Mode drop zone — the page IS the tool */}
         <label
           onDrop={onDrop}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
-          className={`rounded-xl border bg-white px-5 py-6 text-center cursor-pointer transition-colors ${dragging ? 'border-sky-500 bg-sky-50' : 'border-stone-200 hover:border-sky-400'}`}
+          className={`block cursor-pointer rounded-md border-2 border-dashed transition-colors mb-6 ${
+            dragging
+              ? 'border-[var(--color-tool-cyan)] bg-[rgba(90,204,230,0.08)]'
+              : 'border-[var(--color-border)] bg-[var(--color-surface-2)] hover:border-[var(--color-tool-cyan)]/60'
+          }`}
         >
-          <div className="text-2xl mb-1">🖼</div>
-          <div className="font-semibold text-stone-900">Free Mode</div>
-          <div className="text-xs text-stone-500 mt-1">
-            Drag .dcm · ครั้งละ {MAX_FILES} ไฟล์ · ไม่ขึ้น server
+          <div className="px-6 py-16 sm:py-20 text-center">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-md border border-[var(--color-tool-cyan)]/40 bg-[rgba(90,204,230,0.06)] mb-4">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-tool-cyan)]" aria-hidden="true">
+                <path d="M12 3v12M12 3l-4 4M12 3l4 4" />
+                <path d="M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2" />
+              </svg>
+            </div>
+            <div className="text-base font-semibold text-[var(--color-text)] mb-1">
+              Drop .dcm file here
+            </div>
+            <div className="text-xs text-[var(--color-text-muted)] mb-4">
+              หรือคลิกเพื่อเลือก, ครั้งละสูงสุด {MAX_FILES} ไฟล์, ไม่ขึ้น server
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-2 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">
+              <span className="px-2 py-1 rounded border border-[var(--color-border)] bg-[var(--color-bg)]/60">DICOM</span>
+              <span className="px-2 py-1 rounded border border-[var(--color-border)] bg-[var(--color-bg)]/60">Norberg</span>
+              <span className="px-2 py-1 rounded border border-[var(--color-border)] bg-[var(--color-bg)]/60">VHS</span>
+              <span className="px-2 py-1 rounded border border-[var(--color-border)] bg-[var(--color-bg)]/60">Occlusion</span>
+            </div>
+            <input
+              type="file"
+              accept=".dcm,application/dicom"
+              multiple
+              onChange={onFileInput}
+              className="hidden"
+            />
           </div>
-          <input
-            type="file"
-            accept=".dcm,application/dicom"
-            multiple
-            onChange={onFileInput}
-            className="hidden"
-          />
         </label>
-        <ModeCard
-          href="/occlusion"
-          icon="🎯"
-          title="Image Occlusion"
-          desc="Anki-style anatomy/radiograph flashcards"
-        />
-      </section>
 
-      {error && (
-        <p className="text-red-600 text-sm text-center mb-4">{error}</p>
-      )}
+        {error && (
+          <p className="text-[var(--color-active-red)] text-sm text-center mb-4">{error}</p>
+        )}
 
-      {showOnboarding && (
-        <div className="rounded-lg border border-sky-200 bg-sky-50 p-4 mb-6 flex items-start justify-between gap-3">
-          <div className="text-sm text-stone-700 leading-relaxed">
-            <strong className="text-stone-900">👋 ยินดีต้อนรับ Imaging Lab</strong>
-            <ul className="mt-2 pl-5 list-disc space-y-1 text-stone-600">
-              <li>ลาก DICOM (<code>.dcm</code>) ลงในการ์ด <strong>Free Mode</strong> — ครั้งละ 2 ไฟล์ได้ (side-by-side)</li>
-              <li>เปิด viewer แล้วกด <kbd className="px-1 py-0.5 border rounded text-xs">?</kbd> ดู 16 keyboard shortcuts</li>
-              <li>Norberg + VHS + Length/Angle ครบ · 🔒 Anonymize ก่อน share ภาพออก</li>
-              <li>ไฟล์ render ใน browser ล้วน — ไม่ขึ้น server</li>
+        {/* Mode picker — Case Library + Occlusion as siblings */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+          <ModeCard
+            href="/cases"
+            title="Case Library"
+            desc="Curated cases (X-ray, CT, MRI, US)"
+            iconSvg={
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+              </svg>
+            }
+          />
+          <ModeCard
+            href="/occlusion"
+            title="Image Occlusion"
+            desc="Anki-style anatomy and radiograph flashcards"
+            iconSvg={
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="3" y1="9" x2="21" y2="9" />
+                <line x1="9" y1="21" x2="9" y2="9" />
+              </svg>
+            }
+          />
+        </section>
+
+        {showOnboarding && (
+          <div className="rounded-md border border-[var(--color-tool-cyan)]/30 bg-[rgba(90,204,230,0.06)] p-4 mb-6 flex items-start justify-between gap-3">
+            <div className="text-sm text-[var(--color-text)] leading-relaxed">
+              <strong className="text-[var(--color-text)]">ยินดีต้อนรับ Imaging Lab</strong>
+              <ul className="mt-2 pl-5 list-disc space-y-1 text-[var(--color-text-muted)]">
+                <li>ลาก DICOM (<code className="text-[var(--color-tool-cyan)]">.dcm</code>) ลงในกล่อง Free Mode — ครั้งละ 2 ไฟล์ได้ (side-by-side)</li>
+                <li>เปิด viewer แล้วกด <kbd className="px-1.5 py-0.5 border border-[var(--color-border)] rounded text-xs bg-[var(--color-bg)]">?</kbd> ดู 16 keyboard shortcuts</li>
+                <li>Norberg + VHS + Length/Angle ครบ, Anonymize ก่อน share ภาพออก</li>
+                <li>ไฟล์ render ใน browser ล้วน — ไม่ขึ้น server</li>
+              </ul>
+            </div>
+            <button onClick={dismissOnboarding} className="vmx-btn vmx-btn-ghost vmx-btn-sm shrink-0" aria-label="ปิด">✕</button>
+          </div>
+        )}
+
+        {recent.length > 0 && (
+          <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-4 text-sm">
+            <div className="flex items-center justify-between mb-2">
+              <strong className="text-[var(--color-text)] text-xs uppercase tracking-wider">Recent files</strong>
+              <button
+                onClick={clearRecent}
+                className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] underline"
+              >
+                ล้าง
+              </button>
+            </div>
+            <div className="text-xs text-[var(--color-text-muted)] mb-2">
+              File blobs ไม่ persist ข้าม session — เห็นรายการที่นี่แล้วลากไฟล์เดิมจาก disk เพื่อ re-open
+            </div>
+            <ul className="divide-y divide-[var(--color-border)]">
+              {recent.map((r, i) => (
+                <li key={i} className="py-2 flex items-center justify-between gap-2 text-xs text-[var(--color-text-muted)]">
+                  <span className="truncate flex-1 font-mono">
+                    <span className="text-[var(--color-text)]">{r.name}</span>
+                    {' '}— {(r.size / 1024).toFixed(0)} KB,{' '}
+                    {new Date(r.lastModified).toLocaleString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
+                  </span>
+                  <button
+                    onClick={() => removeRecentAt(i)}
+                    aria-label="ลบไฟล์นี้จากประวัติ"
+                    className="w-5 h-5 text-[var(--color-text-muted)] hover:text-[var(--color-active-red)]"
+                  >×</button>
+                </li>
+              ))}
             </ul>
           </div>
-          <button onClick={dismissOnboarding} className="vmx-btn vmx-btn-ghost vmx-btn-sm shrink-0" aria-label="ปิด">✕</button>
-        </div>
-      )}
+        )}
 
-      {recent.length > 0 && (
-        <div className="rounded-lg border border-stone-200 bg-white p-4 text-sm">
-          <div className="flex items-center justify-between mb-2">
-            <strong className="text-stone-700">🕘 Recent files</strong>
-            <button
-              onClick={clearRecent}
-              className="text-xs text-stone-500 hover:text-stone-700 underline"
-            >
-              ล้าง
-            </button>
-          </div>
-          <div className="text-xs text-stone-500 mb-2">
-            File blobs ไม่ persist ข้าม session · เห็นรายการที่นี่แล้วลากไฟล์เดิมจาก disk เพื่อ re-open
-          </div>
-          <ul className="divide-y divide-stone-100">
-            {recent.map((r, i) => (
-              <li key={i} className="py-2 flex items-center justify-between gap-2 text-xs text-stone-600">
-                <span className="truncate flex-1">
-                  📄 <span className="text-stone-800">{r.name}</span> · {(r.size / 1024).toFixed(0)} KB ·{' '}
-                  {new Date(r.lastModified).toLocaleString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
-                </span>
-                <button
-                  onClick={() => removeRecentAt(i)}
-                  aria-label="ลบไฟล์นี้จากประวัติ"
-                  className="w-5 h-5 text-stone-400 hover:text-stone-700"
-                >×</button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+        {/* Quiet footnote, replaces the old centered hero subhead */}
+        <p className="mt-8 text-[11px] text-[var(--color-text-muted)] text-center">
+          New here? <Link href="/about" className="text-[var(--color-tool-cyan)] hover:underline">Read what this lab does ↗</Link>
+        </p>
+      </div>
     </div>
   );
 }
 
-function ModeCard({ href, icon, title, desc }) {
+function ModeCard({ href, title, desc, iconSvg }) {
   return (
     <Link
       href={href}
-      className="rounded-xl border border-stone-200 bg-white px-5 py-6 text-center hover:border-sky-400 hover:shadow-sm transition-all"
+      className="group rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] px-5 py-4 hover:border-[var(--color-tool-cyan)]/60 transition-colors flex items-center gap-4"
     >
-      <div className="text-2xl mb-1">{icon}</div>
-      <div className="font-semibold text-stone-900">{title}</div>
-      <div className="text-xs text-stone-500 mt-1">{desc}</div>
+      <div className="w-9 h-9 rounded border border-[var(--color-border)] bg-[var(--color-bg)] flex items-center justify-center text-[var(--color-tool-cyan)] shrink-0">
+        {iconSvg}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="font-semibold text-[var(--color-text)] group-hover:text-[var(--color-tool-cyan)] transition-colors">{title}</div>
+        <div className="text-xs text-[var(--color-text-muted)] mt-0.5">{desc}</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-muted)] group-hover:text-[var(--color-tool-cyan)] transition-colors shrink-0" aria-hidden="true">
+        <path d="M5 12h14M13 5l7 7-7 7" />
+      </svg>
     </Link>
   );
 }
@@ -283,7 +334,7 @@ function ViewerPane({ file, index, canRemove, onRemove }) {
       <div style={paneHeaderStyle}>
         <span>
           <strong>View {index + 1}:</strong>{' '}
-          <span style={{ color: '#888', fontSize: '0.75rem' }}>{file.name}</span>
+          <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>{file.name}</span>
         </span>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <button
@@ -291,7 +342,7 @@ function ViewerPane({ file, index, canRemove, onRemove }) {
             className="vmx-btn vmx-btn-ghost vmx-btn-sm"
             title="ดู DICOM tags ทั้งหมด"
           >
-            🔍 Info
+            Info
           </button>
           {canRemove && (
             <button
@@ -315,21 +366,27 @@ function ViewerPane({ file, index, canRemove, onRemove }) {
   );
 }
 
-const viewerHeaderStyle = {
-  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-  marginBottom: 12, gap: 8, flexWrap: 'wrap',
-};
 const studyGridStyle = {
   display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 12,
 };
-const paneStyle = { border: '1px solid #ddd', borderRadius: 8, background: '#fff', padding: 8 };
+const paneStyle = {
+  border: '1px solid var(--color-border)',
+  borderRadius: 6,
+  background: 'var(--color-surface-2)',
+  padding: 8,
+};
 const paneHeaderStyle = {
   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-  marginBottom: 8, padding: '4px 6px', fontSize: '0.85rem', color: '#555',
+  marginBottom: 8, padding: '4px 6px', fontSize: '0.85rem', color: 'var(--color-text-muted)',
   flexWrap: 'wrap', gap: 6,
 };
 const removePaneBtnStyle = {
-  width: 24, height: 24, borderRadius: 4, border: '1px solid #ccc', background: '#fff',
-  cursor: 'pointer', color: '#666', fontSize: '0.85rem', lineHeight: 1, padding: 0,
+  width: 24, height: 24, borderRadius: 4,
+  border: '1px solid var(--color-border)',
+  background: 'var(--color-surface-2)',
+  cursor: 'pointer', color: 'var(--color-text-muted)',
+  fontSize: '0.85rem', lineHeight: 1, padding: 0,
 };
-const loadingFallbackStyle = { padding: 40, textAlign: 'center', color: '#888' };
+const loadingFallbackStyle = {
+  padding: 40, textAlign: 'center', color: 'var(--color-text-muted)',
+};
