@@ -35,9 +35,10 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
-      { url: "/smo-logo.png", type: "image/png" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
     ],
-    apple: "/smo-logo.png",
+    apple: "/apple-touch-icon.png",
   },
   openGraph: {
     title: "Imaging Lab — DICOM viewer + AI overlays for vet students",
@@ -48,11 +49,20 @@ export const metadata: Metadata = {
     alternateLocale: ["en_US"],
     siteName: "Imaging Lab",
     url: "https://imaging.cuvetsmo.com",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "Imaging Lab — DICOM + AI overlays for vet students",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Imaging Lab — DICOM viewer + AI overlays for vet students",
     description: "DICOM viewer, Norberg angle, VHS, image occlusion — all in browser.",
+    images: ["/og.png"],
   },
   robots: { index: true, follow: true },
   alternates: { canonical: "https://imaging.cuvetsmo.com" },

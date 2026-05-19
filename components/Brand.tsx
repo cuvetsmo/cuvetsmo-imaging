@@ -7,8 +7,8 @@ export function SiteHeader() {
       <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-2 group" aria-label="Imaging Lab home">
           <Image
-            src="/smo-logo.png"
-            alt="CUVETSMO"
+            src="/imaging-logo-mark.png"
+            alt="Imaging Lab"
             width={32}
             height={32}
             className="rounded"
