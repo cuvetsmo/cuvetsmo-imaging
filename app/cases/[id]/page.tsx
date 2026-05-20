@@ -1,12 +1,14 @@
-import { CaseViewerClient } from "./CaseViewerClient";
+import { CaseDetailView } from "@/components/cases/CaseDetailView";
 
-// Catch-all id resolves to a slug — the client loads /cases.json and
-// fetches the DICOM at /cases/<slug>/<view>.dcm.
+// Catch-all id resolves to a slug. CaseDetailView loads /cases.json on the
+// client, mounts the DICOM viewer and runs the Active Recall workflow.
+// 404-style fallback is rendered inside CaseDetailView when the slug
+// can't be matched.
 export default async function CaseDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  return <CaseViewerClient caseId={id} />;
+  return <CaseDetailView caseId={id} />;
 }

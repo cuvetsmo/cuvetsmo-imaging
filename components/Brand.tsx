@@ -32,6 +32,9 @@ export function SiteHeader() {
           <Link href="/cases" className="px-2 py-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
             Cases
           </Link>
+          <Link href="/atlas" className="px-2 py-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
+            Atlas
+          </Link>
           <Link href="/occlusion" className="px-2 py-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
             Occlusion
           </Link>
