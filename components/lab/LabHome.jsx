@@ -1,6 +1,7 @@
 'use client';
 import { useState, useCallback, useEffect, Suspense, lazy } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useMediaQuery } from '../../lib/dicom/use-media-query.js';
 import { CrosshairPattern } from '../CrosshairPattern';
 
@@ -172,34 +173,39 @@ export default function LabHome() {
   // moves below the hero where it makes sense as a follow-up action
   // rather than the headline.
   return (
-    <div className="relative">
-      {/* Faint DICOM crosshair grid wash behind everything */}
-      <CrosshairPattern className="z-0" opacity={0.035} />
+    <div className="relative imaging-hero-bg">
+      {/* Faint DICOM crosshair grid wash behind everything — kept as clinical signature on top of the new mesh gradient */}
+      <CrosshairPattern className="z-0" opacity={0.028} />
 
-      <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 pt-10 sm:pt-14 pb-10">
+      <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 pt-12 sm:pt-20 pb-10">
         {/* ──── HERO ──── */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-12 items-center mb-14">
+        <section className="grid grid-cols-1 lg:grid-cols-[1.05fr_1fr] gap-10 lg:gap-14 items-center mb-16 sm:mb-20">
           {/* Left: copy + CTAs */}
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--color-tool-cyan)] mb-4">
-              CUVETSMO Imaging · Free for vet students
+            <p className="imaging-eyebrow mb-5">
+              CUVETSMO Imaging Lab · for Y4–Y6 reading clinics
             </p>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[var(--color-text)] leading-[1.1] mb-5">
-              Vet DICOM viewer.<br />
-              <span className="text-[var(--color-tool-cyan)]">Browser-based.</span><br />
-              Free for students.
+            <h1 className="imaging-display text-[2.5rem] sm:text-5xl lg:text-[3.75rem] text-[var(--color-text)] mb-6">
+              Radiographs,<br />
+              <span
+                style={{
+                  background: 'linear-gradient(96deg, #5ACCE6 0%, #A78BFA 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }}
+              >un-blackboxed.</span>
             </h1>
-            <p className="text-base text-[var(--color-text-muted)] leading-relaxed mb-7 max-w-md">
-              เปิดภาพรังสีของหมา-แมวในเบราว์เซอร์ ไม่ส่งภาพขึ้น server, มี overlay Norberg + VHS วินิจฉัย hip dysplasia สำหรับการเรียนการสอน.
+            <p className="text-[15px] sm:text-base text-[var(--color-text-muted)] leading-relaxed mb-8 max-w-[28rem]">
+              เปิดภาพ DICOM ของหมา-แมวใน browser · Norberg + VHS วาดเอง วัดเอง · ไม่ขึ้น server, ไม่ต้อง login.
+              <br />
+              <span className="text-[var(--color-text-faint)]">A diagnostic-reading tool designed for learners, not for hospital dashboards.</span>
             </p>
 
             <div className="flex flex-wrap gap-3">
-              <Link
-                href="/cases"
-                className="inline-flex items-center gap-2 rounded-md bg-[var(--color-tool-cyan)] px-5 py-2.5 text-sm font-semibold text-[var(--color-bg)] hover:bg-[var(--color-tool-cyan)]/90 transition-colors shadow-sm"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" />
+              <Link href="/cases" className="imaging-btn imaging-btn-primary">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <polygon points="5 3 19 12 5 21 5 3" />
                 </svg>
                 เปิด sample case
               </Link>
@@ -209,19 +215,19 @@ export default function LabHome() {
                   e.preventDefault();
                   document.getElementById('dropzone')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }}
-                className="inline-flex items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] px-5 py-2.5 text-sm font-semibold text-[var(--color-text)] hover:border-[var(--color-tool-cyan)]/60 hover:text-[var(--color-tool-cyan)] transition-colors"
+                className="imaging-btn imaging-btn-ghost"
               >
-                หรือลากไฟล์ DICOM ของคุณ
-                <span aria-hidden>↓</span>
+                หรือลากไฟล์ DICOM
+                <span aria-hidden style={{ display: 'inline-block', transform: 'translateY(1px)' }}>↓</span>
               </a>
             </div>
 
-            {/* Capability strip — text-only, no fake buttons */}
-            <ul className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[var(--color-text-muted)]">
-              <li className="flex items-center gap-1.5"><span aria-hidden className="text-[var(--color-tool-cyan)]">●</span> Norberg angle</li>
-              <li className="flex items-center gap-1.5"><span aria-hidden className="text-[var(--color-tool-cyan)]">●</span> VHS · vertebral heart score</li>
-              <li className="flex items-center gap-1.5"><span aria-hidden className="text-[var(--color-tool-cyan)]">●</span> Image occlusion editor</li>
-              <li className="flex items-center gap-1.5"><span aria-hidden className="text-[var(--color-finalized)]">●</span> ไม่ขึ้น server</li>
+            {/* Capability strip — animated breathing dots */}
+            <ul className="mt-8 flex flex-wrap gap-x-5 gap-y-2.5 text-[12px] text-[var(--color-text-muted)] font-mono">
+              <li className="flex items-center gap-2"><span aria-hidden className="imaging-cap-dot" /> Norberg angle</li>
+              <li className="flex items-center gap-2"><span aria-hidden className="imaging-cap-dot" /> VHS · vertebral heart score</li>
+              <li className="flex items-center gap-2"><span aria-hidden className="imaging-cap-dot" /> Image occlusion editor</li>
+              <li className="flex items-center gap-2"><span aria-hidden className="imaging-cap-dot finalized" /> ไม่ขึ้น server</li>
             </ul>
           </div>
 
@@ -234,13 +240,13 @@ export default function LabHome() {
         </section>
 
         {/* ──── DROPZONE ──── */}
-        <section id="dropzone" className="mb-10 scroll-mt-20">
-          <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--color-text)]">
-              Free Mode · ลาก DICOM ของคุณ
+        <section id="dropzone" className="mb-12 scroll-mt-20">
+          <div className="flex items-baseline justify-between mb-4 flex-wrap gap-2">
+            <h2 className="text-[13px] font-mono uppercase tracking-[0.18em] text-[var(--color-text)] flex items-center gap-2">
+              <span className="text-[var(--color-tool-violet)]">02 /</span> Free Mode — ลาก DICOM ของคุณ
             </h2>
-            <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-muted)]">
-              Educational, not for clinical decisions
+            <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--color-text-faint)]">
+              Educational tool · not for clinical decisions
             </span>
           </div>
 
@@ -248,24 +254,21 @@ export default function LabHome() {
             onDrop={onDrop}
             onDragOver={onDragOver}
             onDragLeave={onDragLeave}
-            className={`block cursor-pointer rounded-md border-2 border-dashed transition-colors ${
-              dragging
-                ? 'border-[var(--color-tool-cyan)] bg-[rgba(90,204,230,0.08)]'
-                : 'border-[var(--color-border)] bg-[var(--color-surface-2)] hover:border-[var(--color-tool-cyan)]/60'
-            }`}
+            data-dragging={dragging ? 'true' : 'false'}
+            className="imaging-dropzone"
           >
-            <div className="px-6 py-10 sm:py-12 text-center">
-              <div className="inline-flex items-center justify-center w-10 h-10 rounded-md border border-[var(--color-tool-cyan)]/40 bg-[rgba(90,204,230,0.06)] mb-3">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-tool-cyan)]" aria-hidden="true">
+            <div className="px-6 py-12 sm:py-14 text-center relative z-10">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl border border-[var(--color-border-tool)] bg-[rgba(90,204,230,0.06)] mb-4 shadow-[0_0_24px_-8px_rgba(90,204,230,0.4)]">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-tool-cyan)]" aria-hidden="true">
                   <path d="M12 3v12M12 3l-4 4M12 3l4 4" />
                   <path d="M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2" />
                 </svg>
               </div>
-              <div className="text-sm font-semibold text-[var(--color-text)] mb-1">
-                Drop .dcm file here · หรือคลิกเพื่อเลือก
+              <div className="text-base font-semibold text-[var(--color-text)] mb-1.5 tracking-tight">
+                Drop <code className="font-mono text-[var(--color-tool-cyan)] text-[0.92em]">.dcm</code> file here · หรือคลิกเพื่อเลือก
               </div>
-              <div className="text-xs text-[var(--color-text-muted)]">
-                ครั้งละสูงสุด {MAX_FILES} ไฟล์ (side-by-side study) · render ในเบราว์เซอร์ล้วน ไม่ส่งภาพขึ้น server
+              <div className="text-xs text-[var(--color-text-muted)] max-w-md mx-auto leading-relaxed">
+                ครั้งละสูงสุด {MAX_FILES} ไฟล์ (side-by-side study) · render ในเบราว์เซอร์ล้วน · ไม่ส่งภาพขึ้น server
               </div>
               <input
                 type="file"
@@ -278,35 +281,67 @@ export default function LabHome() {
           </label>
 
           {error && (
-            <p className="text-[var(--color-active-red)] text-sm text-center mt-4">{error}</p>
+            <p className="text-[var(--color-active-red)] text-sm text-center mt-4 font-mono">{error}</p>
           )}
         </section>
 
-        {/* ──── MODE CARDS ──── */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-          <ModeCard
-            href="/cases"
-            title="Case Library"
-            desc="Curated cases · X-ray, CT, MRI, US"
-            iconSvg={
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-              </svg>
-            }
-          />
-          <ModeCard
-            href="/occlusion"
-            title="Image Occlusion"
-            desc="Anki-style anatomy + radiograph flashcards"
-            iconSvg={
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <line x1="3" y1="9" x2="21" y2="9" />
-                <line x1="9" y1="21" x2="9" y2="9" />
-              </svg>
-            }
-          />
+        {/* ──── TOOL TILES ────
+            Custom SVG illustrations for each lab feature. Each tile lifts +1px
+            on hover, reveals a cyan gradient ring, and the illustration color
+            shifts to brand cyan. Replaces the old generic icon+text card. */}
+        <section className="mb-6">
+          <h2 className="text-[13px] font-mono uppercase tracking-[0.18em] text-[var(--color-text)] mb-4 flex items-center gap-2">
+            <span className="text-[var(--color-tool-violet)]">03 /</span> Other modes
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <ToolTile
+              href="/cases"
+              title="Case Library"
+              desc="Curated CC-BY radiographs · X-ray · CT · MR · US"
+              meta="17 cases · grows weekly"
+              art={
+                /* Real Pollinations-generated canine skeleton lateral · cropped to fit tile */
+                <div className="relative w-[110px] h-[68px] rounded-md overflow-hidden bg-black ring-1 ring-[var(--color-border-bright)]">
+                  <Image
+                    src="/illustrations/tile-cases.jpg"
+                    alt=""
+                    fill
+                    sizes="110px"
+                    className="object-cover"
+                  />
+                </div>
+              }
+            />
+            <ToolTile
+              href="/occlusion"
+              title="Image Occlusion"
+              desc="Anki-style masks · cover-the-anatomy active recall"
+              meta="works on PNG + DICOM"
+              art={
+                /* Real radiograph base + SVG occlusion masks overlaid · shows the tool's actual behavior */
+                <div className="relative w-[110px] h-[68px] rounded-md overflow-hidden bg-black ring-1 ring-[var(--color-border-bright)]">
+                  <Image
+                    src="/illustrations/tile-occlusion.jpg"
+                    alt=""
+                    fill
+                    sizes="110px"
+                    className="object-cover"
+                  />
+                  {/* Cyan occlusion masks overlaid · shows the tool action */}
+                  <svg
+                    className="absolute inset-0 w-full h-full"
+                    viewBox="0 0 110 68"
+                    aria-hidden="true"
+                  >
+                    <rect x="22" y="20" width="30" height="14" rx="2" fill="#5ACCE6" opacity="0.88" />
+                    <rect x="60" y="34" width="28" height="14" rx="2" fill="#5ACCE6" opacity="0.88" />
+                    <circle cx="37" cy="27" r="1" fill="#000" opacity="0.4" />
+                    <circle cx="74" cy="41" r="1" fill="#000" opacity="0.4" />
+                  </svg>
+                </div>
+              }
+            />
+          </div>
         </section>
 
         {showOnboarding && (
@@ -400,107 +435,81 @@ function ViewerPreview() {
         </div>
       </div>
 
-      {/* Viewport · stylised SVG canine pelvis + Norberg overlay */}
+      {/* Viewport · real radiograph image + measurement overlay drawn on top.
+          The image is an AI-generated stylised canine lateral (Pollinations.ai
+          Flux seed=11) showing dog body w/ ribcage + spine + pelvis visible.
+          Not a true diagnostic radiograph — "Sample · Illustrative" badge
+          makes this explicit. Overlay coordinates tuned to the visible pelvis
+          area (lower-left) of the lateral image; easy to nudge if the source
+          image is swapped later. */}
       <div className="relative aspect-[5/4] bg-[var(--color-surface-3)]">
+        {/* Base radiograph image */}
+        <Image
+          src="/illustrations/hero-pelvis.jpg"
+          alt=""
+          fill
+          sizes="(min-width: 1024px) 480px, 100vw"
+          className="object-cover"
+          priority
+        />
+
+        {/* Measurement overlay SVG — drawn on top using viewBox 500x400 so
+            coordinates can be tuned by eye against the image. */}
         <svg
           viewBox="0 0 500 400"
-          className="absolute inset-0 w-full h-full"
+          preserveAspectRatio="xMidYMid meet"
+          className="absolute inset-0 w-full h-full pointer-events-none"
           xmlns="http://www.w3.org/2000/svg"
           aria-hidden="true"
         >
-          {/* Background — slightly lifted from pure black so the pelvis can fade out */}
+          {/* Subtle dark vignette so the metadata text reads on busy areas */}
           <defs>
-            <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
-              <stop offset="0%" stopColor="#1a1d3a" />
-              <stop offset="100%" stopColor="#000000" />
-            </radialGradient>
-            <linearGradient id="boneFill" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="#3a3f5a" />
-              <stop offset="100%" stopColor="#1e2240" />
-            </linearGradient>
-            <radialGradient id="femHead" cx="50%" cy="40%" r="60%">
-              <stop offset="0%" stopColor="#6a6f8a" />
-              <stop offset="100%" stopColor="#2a2d4a" />
+            <radialGradient id="overlay-vignette" cx="50%" cy="50%" r="80%">
+              <stop offset="55%" stopColor="rgba(0,0,0,0)" />
+              <stop offset="100%" stopColor="rgba(0,0,0,0.6)" />
             </radialGradient>
           </defs>
-          <rect width="500" height="400" fill="url(#vignette)" />
+          <rect width="500" height="400" fill="url(#overlay-vignette)" />
 
-          {/* Sacrum / spine stub at top center */}
-          <path
-            d="M 230 50 Q 250 40 270 50 L 275 110 Q 250 120 225 110 Z"
-            fill="url(#boneFill)"
-            opacity="0.75"
-          />
-
-          {/* Pelvic wings · two roughly symmetric blades flaring outward */}
-          <path
-            d="M 230 100 Q 130 120 95 180 Q 110 220 180 230 Q 215 220 235 175 Z"
-            fill="url(#boneFill)"
-            opacity="0.8"
-          />
-          <path
-            d="M 270 100 Q 370 120 405 180 Q 390 220 320 230 Q 285 220 265 175 Z"
-            fill="url(#boneFill)"
-            opacity="0.8"
-          />
-
-          {/* Acetabulum sockets (cups) · subtle rim */}
-          <ellipse cx="170" cy="225" rx="40" ry="32" fill="none" stroke="#4a4f6a" strokeWidth="2" opacity="0.7" />
-          <ellipse cx="330" cy="225" rx="40" ry="32" fill="none" stroke="#4a4f6a" strokeWidth="2" opacity="0.7" />
-
-          {/* Femoral heads · spheres seated in acetabulum */}
-          <circle cx="170" cy="225" r="28" fill="url(#femHead)" />
-          <circle cx="330" cy="225" r="28" fill="url(#femHead)" />
-
-          {/* Femoral necks + shafts dropping out of frame */}
-          <path d="M 155 240 L 130 320 L 158 330 L 188 250 Z" fill="url(#boneFill)" opacity="0.85" />
-          <path d="M 345 240 L 370 320 L 342 330 L 312 250 Z" fill="url(#boneFill)" opacity="0.85" />
-
-          {/* ─── Norberg angle overlay · the actual product feature ─── */}
-          {/* Cyan baseline from femoral head center to femoral head center */}
-          <line x1="170" y1="225" x2="330" y2="225" stroke="#5ACCE6" strokeWidth="2" strokeDasharray="0" />
-
-          {/* Left side angle line — from L femoral head center to L acetabular rim */}
-          <line x1="170" y1="225" x2="135" y2="195" stroke="#5ACCE6" strokeWidth="2" />
-          {/* Right side angle line — from R femoral head center to R acetabular rim */}
-          <line x1="330" y1="225" x2="365" y2="195" stroke="#5ACCE6" strokeWidth="2" />
-
+          {/* Norberg overlay — femoral heads + acetabular rims positioned
+              over the visible pelvis area in the lower-left of the image.
+              Not anatomically rigorous (the image is lateral, Norberg needs
+              VD); kept as a stylised "this is what the tool does" demo. */}
+          {/* Cyan baseline · femoral head to femoral head */}
+          <line x1="105" y1="245" x2="170" y2="245" stroke="#5ACCE6" strokeWidth="2" />
+          {/* Angle lines · femoral head → acetabular rim */}
+          <line x1="105" y1="245" x2="88" y2="220" stroke="#5ACCE6" strokeWidth="2" />
+          <line x1="170" y1="245" x2="187" y2="220" stroke="#5ACCE6" strokeWidth="2" />
           {/* Acetabular rim dots */}
-          <circle cx="135" cy="195" r="3.5" fill="#5ACCE6" />
-          <circle cx="365" cy="195" r="3.5" fill="#5ACCE6" />
+          <circle cx="88" cy="220" r="3.5" fill="#5ACCE6" />
+          <circle cx="187" cy="220" r="3.5" fill="#5ACCE6" />
           {/* Femoral head center dots */}
-          <circle cx="170" cy="225" r="3.5" fill="#5ACCE6" />
-          <circle cx="330" cy="225" r="3.5" fill="#5ACCE6" />
+          <circle cx="105" cy="245" r="3.5" fill="#5ACCE6" />
+          <circle cx="170" cy="245" r="3.5" fill="#5ACCE6" />
+          {/* Angle arcs */}
+          <path d="M 120 233 A 14 14 0 0 0 117 244" fill="none" stroke="#5ACCE6" strokeWidth="1.5" />
+          <path d="M 155 233 A 14 14 0 0 1 158 244" fill="none" stroke="#5ACCE6" strokeWidth="1.5" />
 
-          {/* Angle arc · left side */}
-          <path d="M 195 200 A 25 25 0 0 0 188 220" fill="none" stroke="#5ACCE6" strokeWidth="1.5" />
-          {/* Angle arc · right side */}
-          <path d="M 305 200 A 25 25 0 0 1 312 220" fill="none" stroke="#5ACCE6" strokeWidth="1.5" />
-
-          {/* Numeric readouts beside each hip */}
-          <text x="80" y="180" fontSize="14" fill="#5ACCE6" fontFamily="ui-monospace, monospace" fontWeight="600">L: 108°</text>
-          <text x="380" y="180" fontSize="14" fill="#5ACCE6" fontFamily="ui-monospace, monospace" fontWeight="600">R: 105°</text>
-
-          {/* Reticle crosshair · center of viewport */}
-          <g stroke="#5ACCE6" strokeWidth="0.75" opacity="0.4">
-            <line x1="250" y1="190" x2="250" y2="205" />
-            <line x1="242" y1="197.5" x2="258" y2="197.5" />
+          {/* Numeric readouts — floated above the angle area, drop-shadow for contrast */}
+          <g fontFamily="ui-monospace, monospace" fontWeight="600">
+            <text x="35" y="208" fontSize="12" fill="#5ACCE6">L: 108°</text>
+            <text x="200" y="208" fontSize="12" fill="#5ACCE6">R: 105°</text>
           </g>
 
-          {/* Top-left workspace metadata · DICOM tags style */}
-          <g fontFamily="ui-monospace, monospace" fontSize="9" fill="#A19FAD">
+          {/* Top-left DICOM metadata · monospace, kept on dark area */}
+          <g fontFamily="ui-monospace, monospace" fontSize="9" fill="#D4D4D8">
             <text x="12" y="22">MRN: 12345678</text>
             <text x="12" y="36">Modality: DX</text>
             <text x="12" y="50">Acquired: 2026-05-20</text>
           </g>
-          <g fontFamily="ui-monospace, monospace" fontSize="9" fill="#A19FAD" textAnchor="end">
+          <g fontFamily="ui-monospace, monospace" fontSize="9" fill="#D4D4D8" textAnchor="end">
             <text x="488" y="22">WW: 4096</text>
             <text x="488" y="36">WL: 2048</text>
             <text x="488" y="50">Px: 0.142mm</text>
           </g>
 
-          {/* Bottom-right scale ruler */}
-          <g stroke="#A19FAD" strokeWidth="1" opacity="0.6">
+          {/* Bottom-right scale ruler — gives visual sense of measurement */}
+          <g stroke="#D4D4D8" strokeWidth="1" opacity="0.75">
             <line x1="370" y1="380" x2="470" y2="380" />
             <line x1="370" y1="376" x2="370" y2="384" />
             <line x1="395" y1="378" x2="395" y2="382" />
@@ -508,12 +517,12 @@ function ViewerPreview() {
             <line x1="445" y1="378" x2="445" y2="382" />
             <line x1="470" y1="376" x2="470" y2="384" />
           </g>
-          <text x="420" y="395" textAnchor="middle" fontSize="9" fontFamily="ui-monospace, monospace" fill="#A19FAD">10 mm</text>
+          <text x="420" y="395" textAnchor="middle" fontSize="9" fontFamily="ui-monospace, monospace" fill="#D4D4D8">10 mm</text>
         </svg>
 
-        {/* Floating "Sample · Illustrative" badge so visitors never confuse the
-            stylised SVG with a real radiograph. */}
-        <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded bg-[rgba(0,0,0,0.6)] backdrop-blur-sm px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] border border-[var(--color-border)]">
+        {/* Floating "Sample · Illustrative" badge — makes it explicit the image
+            is AI-generated, not a real diagnostic radiograph. */}
+        <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded bg-[rgba(0,0,0,0.7)] backdrop-blur-sm px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] border border-[var(--color-border-bright)]">
           <span className="inline-flex h-1.5 w-1.5 rounded-full bg-[var(--color-tool-cyan)]" aria-hidden />
           Sample · Illustrative
         </div>
@@ -528,20 +537,42 @@ function ViewerPreview() {
   );
 }
 
-function ModeCard({ href, title, desc, iconSvg }) {
+/**
+ * ToolTile — tactile feature tile with custom SVG illustration on the right.
+ *
+ * Hover behavior comes from the .imaging-tool-tile CSS class:
+ *   - Lifts 2px
+ *   - Cyan gradient ring reveals around border
+ *   - art color shifts from text-muted → tool-cyan
+ *   - arrow shifts 3px right + colors to cyan
+ *
+ * The `art` slot receives an inline SVG that uses `currentColor` so the tile
+ * can control the line color via the .imaging-tile-art class.
+ */
+function ToolTile({ href, title, desc, meta, art }) {
   return (
-    <Link
-      href={href}
-      className="group rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] px-5 py-4 hover:border-[var(--color-tool-cyan)]/60 transition-colors flex items-center gap-4"
-    >
-      <div className="w-9 h-9 rounded border border-[var(--color-border)] bg-[var(--color-bg)] flex items-center justify-center text-[var(--color-tool-cyan)] shrink-0">
-        {iconSvg}
+    <Link href={href} className="imaging-tool-tile group">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2 mb-1">
+          <span className="font-semibold text-[var(--color-text)] tracking-tight text-[15px]">{title}</span>
+          {meta && (
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--color-text-faint)]">
+              {meta}
+            </span>
+          )}
+        </div>
+        <div className="text-[13px] text-[var(--color-text-muted)] leading-relaxed">{desc}</div>
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="font-semibold text-[var(--color-text)] group-hover:text-[var(--color-tool-cyan)] transition-colors">{title}</div>
-        <div className="text-xs text-[var(--color-text-muted)] mt-0.5">{desc}</div>
+      <div className="imaging-tile-art self-center">
+        {art}
       </div>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-muted)] group-hover:text-[var(--color-tool-cyan)] transition-colors shrink-0" aria-hidden="true">
+      <svg
+        width="16" height="16" viewBox="0 0 24 24"
+        fill="none" stroke="currentColor" strokeWidth="1.75"
+        strokeLinecap="round" strokeLinejoin="round"
+        className="imaging-tile-arrow"
+        aria-hidden="true"
+      >
         <path d="M5 12h14M13 5l7 7-7 7" />
       </svg>
     </Link>
