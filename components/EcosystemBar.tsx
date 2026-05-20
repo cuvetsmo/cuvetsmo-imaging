@@ -3,17 +3,21 @@ import Image from "next/image";
 /**
  * EcosystemBar — thin top-of-page strip carrying the shared CUVETSMO
  * ecosystem nav with real sub-brand logos. OHIF-dark color tokens.
+ *
+ * 2026-05-20 — brand honesty sweep. Dropped vetmock + hanong from the
+ * bar. Both are Palm's personal projects, not official CUVETSMO sub-
+ * brands; listing them in a strip labelled "CUVETSMO ecosystem" was
+ * implying ownership the SMO doesn't have. They still surface on
+ * cuvetsmo.com under partner tier with copy that names Palm as author.
  */
 
-type EcosystemSite = "main" | "web3" | "labs" | "imaging" | "vetmock" | "hanong";
+type EcosystemSite = "main" | "web3" | "labs" | "imaging";
 
 const SITES: { id: EcosystemSite; label: string; href: string; logo: string }[] = [
   { id: "main",    label: "cuvetsmo.com", href: "https://cuvetsmo.com",         logo: "/smo-logo.png" },
-  { id: "web3",    label: "web3",         href: "https://web3.cuvetsmo.com",    logo: "/web3-logo-mark.png" },
   { id: "labs",    label: "labs",         href: "https://labs.cuvetsmo.com",    logo: "/labs-logo-mark.png" },
+  { id: "web3",    label: "web3",         href: "https://web3.cuvetsmo.com",    logo: "/web3-logo-mark.png" },
   { id: "imaging", label: "imaging",      href: "https://imaging.cuvetsmo.com", logo: "/imaging-logo-mark.png" },
-  { id: "vetmock", label: "vetmock",      href: "https://vetmock.vercel.app",   logo: "/vetmock-logo-mark.png" },
-  { id: "hanong",  label: "hanong",       href: "https://hanong.vercel.app",    logo: "/hanong-logo-mark.png" },
 ];
 
 export function EcosystemBar({ current }: { current: EcosystemSite }) {

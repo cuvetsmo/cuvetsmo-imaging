@@ -156,78 +156,138 @@ export default function LabHome() {
     );
   }
 
-  // ── HOME / WORKSPACE (no marketing hero — the page IS the tool) ──
+  // ── HOME / WORKSPACE ──
+  //
+  // 2026-05-20 hero redesign. The previous "the page IS the tool" layout
+  // (compact title + giant empty dropzone + 2 mode cards) tested poorly:
+  // the dropzone read as a placeholder rather than a product, the 4 pills
+  // (DICOM/Norberg/VHS/Occlusion) looked like clickable CTAs but weren't,
+  // and visitors had no preview of what the viewer actually does.
+  //
+  // New flow follows the OHIF.org landing pattern (see
+  // sessions/2026-05-20 imaging redesign): three-noun hero + a stylised
+  // preview of the viewer running a Norberg case on the right, with two
+  // explicit CTAs (Sample case as primary, your-own-file as secondary
+  // that scrolls down to the existing dropzone). The dropzone itself
+  // moves below the hero where it makes sense as a follow-up action
+  // rather than the headline.
   return (
     <div className="relative">
-      {/* Faint DICOM crosshair grid wash behind the workspace */}
+      {/* Faint DICOM crosshair grid wash behind everything */}
       <CrosshairPattern className="z-0" opacity={0.035} />
 
-      <div className="relative z-10 mx-auto max-w-5xl px-4 sm:px-6 pt-6 pb-10">
-        {/* Compact header strip — no hero, just a workspace title bar */}
-        <div className="flex items-baseline justify-between mb-5 flex-wrap gap-2">
+      <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 pt-10 sm:pt-14 pb-10">
+        {/* ──── HERO ──── */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-12 items-center mb-14">
+          {/* Left: copy + CTAs */}
           <div>
-            <h1 className="text-lg font-semibold tracking-tight text-[var(--color-text)]">
-              Free Mode
-            </h1>
-            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-              Drag DICOM onto the dropzone, ครั้งละ {MAX_FILES} ไฟล์, render ในเบราว์เซอร์ล้วน
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--color-tool-cyan)] mb-4">
+              CUVETSMO Imaging · Free for vet students
             </p>
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[var(--color-text)] leading-[1.1] mb-5">
+              Vet DICOM viewer.<br />
+              <span className="text-[var(--color-tool-cyan)]">Browser-based.</span><br />
+              Free for students.
+            </h1>
+            <p className="text-base text-[var(--color-text-muted)] leading-relaxed mb-7 max-w-md">
+              เปิดภาพรังสีของหมา-แมวในเบราว์เซอร์ ไม่ส่งภาพขึ้น server, มี overlay Norberg + VHS วินิจฉัย hip dysplasia สำหรับการเรียนการสอน.
+            </p>
+
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/cases"
+                className="inline-flex items-center gap-2 rounded-md bg-[var(--color-tool-cyan)] px-5 py-2.5 text-sm font-semibold text-[var(--color-bg)] hover:bg-[var(--color-tool-cyan)]/90 transition-colors shadow-sm"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" />
+                </svg>
+                เปิด sample case
+              </Link>
+              <a
+                href="#dropzone"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById('dropzone')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="inline-flex items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] px-5 py-2.5 text-sm font-semibold text-[var(--color-text)] hover:border-[var(--color-tool-cyan)]/60 hover:text-[var(--color-tool-cyan)] transition-colors"
+              >
+                หรือลากไฟล์ DICOM ของคุณ
+                <span aria-hidden>↓</span>
+              </a>
+            </div>
+
+            {/* Capability strip — text-only, no fake buttons */}
+            <ul className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[var(--color-text-muted)]">
+              <li className="flex items-center gap-1.5"><span aria-hidden className="text-[var(--color-tool-cyan)]">●</span> Norberg angle</li>
+              <li className="flex items-center gap-1.5"><span aria-hidden className="text-[var(--color-tool-cyan)]">●</span> VHS · vertebral heart score</li>
+              <li className="flex items-center gap-1.5"><span aria-hidden className="text-[var(--color-tool-cyan)]">●</span> Image occlusion editor</li>
+              <li className="flex items-center gap-1.5"><span aria-hidden className="text-[var(--color-finalized)]">●</span> ไม่ขึ้น server</li>
+            </ul>
           </div>
-          <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-muted)]">
-            Educational, not for clinical decisions
-          </span>
-        </div>
 
-        {/* PRIMARY: Free Mode drop zone — the page IS the tool */}
-        <label
-          onDrop={onDrop}
-          onDragOver={onDragOver}
-          onDragLeave={onDragLeave}
-          className={`block cursor-pointer rounded-md border-2 border-dashed transition-colors mb-6 ${
-            dragging
-              ? 'border-[var(--color-tool-cyan)] bg-[rgba(90,204,230,0.08)]'
-              : 'border-[var(--color-border)] bg-[var(--color-surface-2)] hover:border-[var(--color-tool-cyan)]/60'
-          }`}
-        >
-          <div className="px-6 py-16 sm:py-20 text-center">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-md border border-[var(--color-tool-cyan)]/40 bg-[rgba(90,204,230,0.06)] mb-4">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-tool-cyan)]" aria-hidden="true">
-                <path d="M12 3v12M12 3l-4 4M12 3l4 4" />
-                <path d="M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2" />
-              </svg>
-            </div>
-            <div className="text-base font-semibold text-[var(--color-text)] mb-1">
-              Drop .dcm file here
-            </div>
-            <div className="text-xs text-[var(--color-text-muted)] mb-4">
-              หรือคลิกเพื่อเลือก, ครั้งละสูงสุด {MAX_FILES} ไฟล์, ไม่ขึ้น server
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-2 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">
-              <span className="px-2 py-1 rounded border border-[var(--color-border)] bg-[var(--color-bg)]/60">DICOM</span>
-              <span className="px-2 py-1 rounded border border-[var(--color-border)] bg-[var(--color-bg)]/60">Norberg</span>
-              <span className="px-2 py-1 rounded border border-[var(--color-border)] bg-[var(--color-bg)]/60">VHS</span>
-              <span className="px-2 py-1 rounded border border-[var(--color-border)] bg-[var(--color-bg)]/60">Occlusion</span>
-            </div>
-            <input
-              type="file"
-              accept=".dcm,application/dicom"
-              multiple
-              onChange={onFileInput}
-              className="hidden"
-            />
+          {/* Right: stylised viewer preview · static SVG, not a live viewer.
+              Mimics the chrome of the real DicomViewport (toolbar, viewport
+              frame, measurement readout) with a canine pelvis sketch + Norberg
+              angle overlay drawn in. Labelled as "Sample · Illustrative" so
+              we never imply this is a real diagnostic radiograph. */}
+          <ViewerPreview />
+        </section>
+
+        {/* ──── DROPZONE ──── */}
+        <section id="dropzone" className="mb-10 scroll-mt-20">
+          <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--color-text)]">
+              Free Mode · ลาก DICOM ของคุณ
+            </h2>
+            <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-muted)]">
+              Educational, not for clinical decisions
+            </span>
           </div>
-        </label>
 
-        {error && (
-          <p className="text-[var(--color-active-red)] text-sm text-center mb-4">{error}</p>
-        )}
+          <label
+            onDrop={onDrop}
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            className={`block cursor-pointer rounded-md border-2 border-dashed transition-colors ${
+              dragging
+                ? 'border-[var(--color-tool-cyan)] bg-[rgba(90,204,230,0.08)]'
+                : 'border-[var(--color-border)] bg-[var(--color-surface-2)] hover:border-[var(--color-tool-cyan)]/60'
+            }`}
+          >
+            <div className="px-6 py-10 sm:py-12 text-center">
+              <div className="inline-flex items-center justify-center w-10 h-10 rounded-md border border-[var(--color-tool-cyan)]/40 bg-[rgba(90,204,230,0.06)] mb-3">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-tool-cyan)]" aria-hidden="true">
+                  <path d="M12 3v12M12 3l-4 4M12 3l4 4" />
+                  <path d="M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2" />
+                </svg>
+              </div>
+              <div className="text-sm font-semibold text-[var(--color-text)] mb-1">
+                Drop .dcm file here · หรือคลิกเพื่อเลือก
+              </div>
+              <div className="text-xs text-[var(--color-text-muted)]">
+                ครั้งละสูงสุด {MAX_FILES} ไฟล์ (side-by-side study) · render ในเบราว์เซอร์ล้วน ไม่ส่งภาพขึ้น server
+              </div>
+              <input
+                type="file"
+                accept=".dcm,application/dicom"
+                multiple
+                onChange={onFileInput}
+                className="hidden"
+              />
+            </div>
+          </label>
 
-        {/* Mode picker — Case Library + Occlusion as siblings */}
+          {error && (
+            <p className="text-[var(--color-active-red)] text-sm text-center mt-4">{error}</p>
+          )}
+        </section>
+
+        {/* ──── MODE CARDS ──── */}
         <section className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
           <ModeCard
             href="/cases"
             title="Case Library"
-            desc="Curated cases (X-ray, CT, MRI, US)"
+            desc="Curated cases · X-ray, CT, MRI, US"
             iconSvg={
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
@@ -238,7 +298,7 @@ export default function LabHome() {
           <ModeCard
             href="/occlusion"
             title="Image Occlusion"
-            desc="Anki-style anatomy and radiograph flashcards"
+            desc="Anki-style anatomy + radiograph flashcards"
             iconSvg={
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -301,6 +361,168 @@ export default function LabHome() {
         <p className="mt-8 text-[11px] text-[var(--color-text-muted)] text-center">
           New here? <Link href="/about" className="text-[var(--color-tool-cyan)] hover:underline">Read what this lab does ↗</Link>
         </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * ViewerPreview — static SVG mockup of the DICOM viewer shown in the hero.
+ *
+ * Drawing a stylised canine pelvis with the Norberg angle overlay already
+ * applied. NOT a real radiograph — labelled "Sample · Illustrative" so
+ * visitors don't mistake it for a diagnostic image. We avoid using a real
+ * patient X-ray here because licensing CC-BY vet radiographs takes effort
+ * and the stylised version reads cleanly as "this is what the tool does".
+ *
+ * The chrome (toolbar row + viewport frame + measurement readout) mimics
+ * the real DicomViewport so visitors recognise the workspace they'll get
+ * after they click "Open sample case" / drop a file.
+ */
+function ViewerPreview() {
+  return (
+    <div
+      className="relative rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-3)] shadow-xl overflow-hidden"
+      role="img"
+      aria-label="Preview of the DICOM viewer showing a canine pelvis with Norberg angle overlay drawn — illustrative, not a real radiograph"
+    >
+      {/* Toolbar row */}
+      <div className="flex items-center justify-between px-3 py-2 bg-[var(--color-surface-2)] border-b border-[var(--color-border)] text-[10px] uppercase tracking-wider text-[var(--color-text-muted)]">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex h-1.5 w-1.5 rounded-full bg-[var(--color-finalized)]" aria-hidden />
+          <span className="font-mono">cu-001 · canine pelvis · VD</span>
+        </div>
+        <div className="flex items-center gap-3 font-mono">
+          <span>W/L</span>
+          <span>Pan</span>
+          <span className="text-[var(--color-tool-cyan)]">∠ Norberg</span>
+          <span>↕ Stack</span>
+        </div>
+      </div>
+
+      {/* Viewport · stylised SVG canine pelvis + Norberg overlay */}
+      <div className="relative aspect-[5/4] bg-[var(--color-surface-3)]">
+        <svg
+          viewBox="0 0 500 400"
+          className="absolute inset-0 w-full h-full"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+          {/* Background — slightly lifted from pure black so the pelvis can fade out */}
+          <defs>
+            <radialGradient id="vignette" cx="50%" cy="50%" r="70%">
+              <stop offset="0%" stopColor="#1a1d3a" />
+              <stop offset="100%" stopColor="#000000" />
+            </radialGradient>
+            <linearGradient id="boneFill" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="#3a3f5a" />
+              <stop offset="100%" stopColor="#1e2240" />
+            </linearGradient>
+            <radialGradient id="femHead" cx="50%" cy="40%" r="60%">
+              <stop offset="0%" stopColor="#6a6f8a" />
+              <stop offset="100%" stopColor="#2a2d4a" />
+            </radialGradient>
+          </defs>
+          <rect width="500" height="400" fill="url(#vignette)" />
+
+          {/* Sacrum / spine stub at top center */}
+          <path
+            d="M 230 50 Q 250 40 270 50 L 275 110 Q 250 120 225 110 Z"
+            fill="url(#boneFill)"
+            opacity="0.75"
+          />
+
+          {/* Pelvic wings · two roughly symmetric blades flaring outward */}
+          <path
+            d="M 230 100 Q 130 120 95 180 Q 110 220 180 230 Q 215 220 235 175 Z"
+            fill="url(#boneFill)"
+            opacity="0.8"
+          />
+          <path
+            d="M 270 100 Q 370 120 405 180 Q 390 220 320 230 Q 285 220 265 175 Z"
+            fill="url(#boneFill)"
+            opacity="0.8"
+          />
+
+          {/* Acetabulum sockets (cups) · subtle rim */}
+          <ellipse cx="170" cy="225" rx="40" ry="32" fill="none" stroke="#4a4f6a" strokeWidth="2" opacity="0.7" />
+          <ellipse cx="330" cy="225" rx="40" ry="32" fill="none" stroke="#4a4f6a" strokeWidth="2" opacity="0.7" />
+
+          {/* Femoral heads · spheres seated in acetabulum */}
+          <circle cx="170" cy="225" r="28" fill="url(#femHead)" />
+          <circle cx="330" cy="225" r="28" fill="url(#femHead)" />
+
+          {/* Femoral necks + shafts dropping out of frame */}
+          <path d="M 155 240 L 130 320 L 158 330 L 188 250 Z" fill="url(#boneFill)" opacity="0.85" />
+          <path d="M 345 240 L 370 320 L 342 330 L 312 250 Z" fill="url(#boneFill)" opacity="0.85" />
+
+          {/* ─── Norberg angle overlay · the actual product feature ─── */}
+          {/* Cyan baseline from femoral head center to femoral head center */}
+          <line x1="170" y1="225" x2="330" y2="225" stroke="#5ACCE6" strokeWidth="2" strokeDasharray="0" />
+
+          {/* Left side angle line — from L femoral head center to L acetabular rim */}
+          <line x1="170" y1="225" x2="135" y2="195" stroke="#5ACCE6" strokeWidth="2" />
+          {/* Right side angle line — from R femoral head center to R acetabular rim */}
+          <line x1="330" y1="225" x2="365" y2="195" stroke="#5ACCE6" strokeWidth="2" />
+
+          {/* Acetabular rim dots */}
+          <circle cx="135" cy="195" r="3.5" fill="#5ACCE6" />
+          <circle cx="365" cy="195" r="3.5" fill="#5ACCE6" />
+          {/* Femoral head center dots */}
+          <circle cx="170" cy="225" r="3.5" fill="#5ACCE6" />
+          <circle cx="330" cy="225" r="3.5" fill="#5ACCE6" />
+
+          {/* Angle arc · left side */}
+          <path d="M 195 200 A 25 25 0 0 0 188 220" fill="none" stroke="#5ACCE6" strokeWidth="1.5" />
+          {/* Angle arc · right side */}
+          <path d="M 305 200 A 25 25 0 0 1 312 220" fill="none" stroke="#5ACCE6" strokeWidth="1.5" />
+
+          {/* Numeric readouts beside each hip */}
+          <text x="80" y="180" fontSize="14" fill="#5ACCE6" fontFamily="ui-monospace, monospace" fontWeight="600">L: 108°</text>
+          <text x="380" y="180" fontSize="14" fill="#5ACCE6" fontFamily="ui-monospace, monospace" fontWeight="600">R: 105°</text>
+
+          {/* Reticle crosshair · center of viewport */}
+          <g stroke="#5ACCE6" strokeWidth="0.75" opacity="0.4">
+            <line x1="250" y1="190" x2="250" y2="205" />
+            <line x1="242" y1="197.5" x2="258" y2="197.5" />
+          </g>
+
+          {/* Top-left workspace metadata · DICOM tags style */}
+          <g fontFamily="ui-monospace, monospace" fontSize="9" fill="#A19FAD">
+            <text x="12" y="22">MRN: 12345678</text>
+            <text x="12" y="36">Modality: DX</text>
+            <text x="12" y="50">Acquired: 2026-05-20</text>
+          </g>
+          <g fontFamily="ui-monospace, monospace" fontSize="9" fill="#A19FAD" textAnchor="end">
+            <text x="488" y="22">WW: 4096</text>
+            <text x="488" y="36">WL: 2048</text>
+            <text x="488" y="50">Px: 0.142mm</text>
+          </g>
+
+          {/* Bottom-right scale ruler */}
+          <g stroke="#A19FAD" strokeWidth="1" opacity="0.6">
+            <line x1="370" y1="380" x2="470" y2="380" />
+            <line x1="370" y1="376" x2="370" y2="384" />
+            <line x1="395" y1="378" x2="395" y2="382" />
+            <line x1="420" y1="376" x2="420" y2="384" />
+            <line x1="445" y1="378" x2="445" y2="382" />
+            <line x1="470" y1="376" x2="470" y2="384" />
+          </g>
+          <text x="420" y="395" textAnchor="middle" fontSize="9" fontFamily="ui-monospace, monospace" fill="#A19FAD">10 mm</text>
+        </svg>
+
+        {/* Floating "Sample · Illustrative" badge so visitors never confuse the
+            stylised SVG with a real radiograph. */}
+        <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded bg-[rgba(0,0,0,0.6)] backdrop-blur-sm px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] border border-[var(--color-border)]">
+          <span className="inline-flex h-1.5 w-1.5 rounded-full bg-[var(--color-tool-cyan)]" aria-hidden />
+          Sample · Illustrative
+        </div>
+      </div>
+
+      {/* Footer · measurement readout strip · mirrors the real viewer chrome */}
+      <div className="flex items-center justify-between px-3 py-2 bg-[var(--color-surface-2)] border-t border-[var(--color-border)] text-[10px] font-mono text-[var(--color-text-muted)]">
+        <span>∠ Norberg · L 108° / R 105°</span>
+        <span className="text-[var(--color-tool-cyan)]">Open sample case →</span>
       </div>
     </div>
   );
