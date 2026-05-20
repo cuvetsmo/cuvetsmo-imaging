@@ -1,48 +1,60 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
- * OHIF-dark clinical workspace palette (restored 2026-05-20 evening).
+ * imaging.cuvetsmo.com — clinical-creative theme
  *
- * Phase 0.5 experimented with a neutral near-black + violet/cyan duo plus
- * ambient mesh gradient + grain noise + animated capability dots + display-
- * weight gradient text. Palm preferred the original OHIF cohesion ("แอบสวย"),
- * so the palette + ambient + animation layer all revert here.
+ * Phase 0 used OHIF defaults (docs.ohif.org/colors-and-type) verbatim — felt
+ * like enterprise medical software circa 2018. Phase 0.5 (2026-05-20 evening)
+ * rebalances toward a "creative-scientific tool" voice:
+ *   - Neutral near-black base (warmer than OHIF's blue-tinted #090C29)
+ *   - Cyan kept as primary tool color (brand consistency w/ existing logo)
+ *   - Violet added as secondary highlight for hero / eyebrow moments
+ *   - Hairline borders that don't shout
+ *   - Ambient mesh gradient + grain noise for hero surface
  *
- * What KEEPS from Phase 0.5:
- *   - Real Pollinations-generated radiograph art in ViewerPreview + tiles
- *   - .imaging-tool-tile component class (image art + meta + arrow layout)
- *
- * Locked palette source: docs.ohif.org/colors-and-type — canonical for vet
- * medical imaging UI. Tools accent stays cyan; no secondary violet anymore.
+ * Distinct from sister CUVETSMO subdomains by design:
+ *   - labs   = cream + warm-orange editorial
+ *   - web3   = dark + Base Blue
+ *   - imaging = dark + cyan + violet (creative-clinical)
+ *   - docs   = TBD
  * --------------------------------------------------------------------------- */
 :root {
-  /* Surfaces */
-  --color-bg: #090C29;            /* page background, near-black clinical */
-  --color-surface-2: #0F1232;     /* panels, cards, drop zone fill */
+  /* Surfaces — neutral near-black (vs OHIF's blue-tinted #090C29) */
+  --color-bg: #08090F;            /* page background, near-black neutral */
+  --color-surface-2: #101116;     /* panels, cards, drop zone fill */
   --color-surface-3: #000000;     /* viewport (always pure black for DICOM) */
+  --color-surface-lift: #15171F;  /* hover state of panels */
 
   /* Text */
   --color-text: #FAFAFA;
-  --color-text-muted: #A19FAD;
+  --color-text-muted: #A1A1AA;
+  --color-text-faint: #71717A;
 
-  /* Tools / accents */
-  --color-tool-cyan: #5ACCE6;     /* default annotation strokes, primary action */
-  --color-active-red: #BA1F40;    /* active measurement / urgent state */
-  --color-finalized: #05D97C;     /* measurement confirmed / saved */
-  --color-brand: #348CFD;         /* OHIF primary.active in dark mode */
+  /* Tools — cyan stays (brand), violet new (highlight) */
+  --color-tool-cyan: #5ACCE6;     /* primary tool color · annotations, active CTA */
+  --color-tool-violet: #A78BFA;   /* secondary accent · eyebrow, hero glyph, special moments */
+  --color-active-red: #FF4D6D;    /* active measurement / urgent state */
+  --color-finalized: #34D399;     /* measurement confirmed / saved */
+  --color-brand: var(--color-tool-cyan);
 
-  /* Borders, dividers */
-  --color-border: #1E2240;
-  --color-border-bright: #27272A;
+  /* Borders, dividers — hairlines that don't shout */
+  --color-border: rgba(255, 255, 255, 0.07);
+  --color-border-bright: rgba(255, 255, 255, 0.14);
+  --color-border-tool: rgba(90, 204, 230, 0.32);
+
+  /* Glow shadows for tactile feel */
+  --shadow-tool: 0 0 0 1px rgba(90, 204, 230, 0.2), 0 0 24px -8px rgba(90, 204, 230, 0.4);
+  --shadow-lift: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 24px -12px rgba(0, 0, 0, 0.6);
 
   /* Font stack — Inter for UI, IBM Plex Sans Thai for Thai glyphs */
   --font-sans: var(--font-inter), var(--font-ibm-plex-sans-thai), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 
   /* Legacy aliases — keep lifted VetMock components working */
   --color-ink: var(--color-text);
   --color-ink-soft: var(--color-text-muted);
   --color-surface: var(--color-surface-2);
-  --color-brand-hover: #1E6FE0;
+  --color-brand-hover: #7DDCEF;
   --color-brand-soft: rgba(90, 204, 230, 0.12);
 
   /* ImageOcclusionView CSS vars (kept for the lifted component) */
@@ -59,6 +71,7 @@
   --color-background: var(--color-bg);
   --color-foreground: var(--color-text);
   --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 }
 
 html {
@@ -70,59 +83,316 @@ html {
 
 body {
   font-family: var(--font-sans);
-  font-feature-settings: "kern" 1, "liga" 1;
+  font-feature-settings: "kern" 1, "liga" 1, "cv11" 1, "ss01" 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: var(--color-bg);
   color: var(--color-text);
+  letter-spacing: -0.005em;
 }
 
-/* Selection — quiet cyan tint, matches tool accent */
+/* Selection — quiet cyan tint */
 ::selection {
-  background: rgba(90, 204, 230, 0.24);
+  background: rgba(90, 204, 230, 0.28);
   color: var(--color-text);
 }
 
 /* ---------------------------------------------------------------------------
- * Tool tile — KEPT from Phase 0.5. Image-art layout with meta + arrow.
- * Hover state simplified to one-shot border + arrow nudge (no cyan gradient
- * ring reveal, no 2px lift) so it stays cohesive with the rest of OHIF chrome.
+ * Ambient hero surface
+ *
+ * Layered mesh gradient + faint grain noise so the hero feels alive without
+ * fluff. Three radial-gradient blooms (violet · cyan · neutral) at low alpha,
+ * + a CSS grain noise via SVG turbulence. NO motion by default — respects
+ * prefers-reduced-motion. Subtle parallax-feel from the radial centers being
+ * just off the visible area.
+ * --------------------------------------------------------------------------- */
+.imaging-hero-bg {
+  position: relative;
+  isolation: isolate;
+  /* Scope paint and layout effects to this subtree so the rest of the page
+     doesn't repaint when the hero rerenders. Significant on long-scrolled
+     pages where the dropzone or recent-files list can rerender. */
+  contain: paint;
+}
+.imaging-hero-bg::before,
+.imaging-hero-bg::after {
+  content: "";
+  position: absolute;
+  /* Constrain ambient layers to the top ~900px (covers hero + dropzone) so
+     we don't paint a giant gradient + noise over the entire scrollable page.
+     Previously these were inset:0 which painted across the whole vault. */
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 900px;
+  z-index: -1;
+  pointer-events: none;
+}
+/* Layer 1 — radial mesh blooms · GPU-composited gradients */
+.imaging-hero-bg::before {
+  background:
+    radial-gradient(60% 50% at 12% 0%, rgba(167, 139, 250, 0.16), transparent 70%),
+    radial-gradient(50% 50% at 90% 30%, rgba(90, 204, 230, 0.12), transparent 75%),
+    radial-gradient(40% 40% at 50% 100%, rgba(167, 139, 250, 0.06), transparent 75%);
+}
+/* Layer 2 — grain noise from SVG turbulence, very faint.
+   The data-uri is decoded once and tiled cheaply; constraining height avoids
+   compositing a turbulence layer the size of the whole page. */
+.imaging-hero-bg::after {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.04 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-size: 180px 180px;
+  mix-blend-mode: overlay;
+  opacity: 0.55;
+}
+
+/* ---------------------------------------------------------------------------
+ * Typography utilities — display-weight for hero, tighter tracking
+ * --------------------------------------------------------------------------- */
+.imaging-display {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.04;
+}
+.imaging-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--color-tool-violet);
+}
+.imaging-eyebrow::before {
+  content: "▍ ";
+  color: var(--color-tool-violet);
+  opacity: 0.7;
+  animation: imaging-eyebrow-blink 2.4s steps(2, end) infinite;
+}
+@keyframes imaging-eyebrow-blink {
+  0%, 50% { opacity: 0.85; }
+  51%, 100% { opacity: 0.25; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .imaging-eyebrow::before { animation: none; opacity: 0.6; }
+}
+
+/* ---------------------------------------------------------------------------
+ * Buttons — refined tactile feel
+ *   Primary  = cyan-fill, dark text, glow ring on hover
+ *   Ghost    = transparent, hairline border, lifts on hover
+ *   Violet   = secondary accent for special moments (rare)
+ * --------------------------------------------------------------------------- */
+.imaging-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  line-height: 1;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 140ms cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 140ms,
+              border-color 140ms,
+              box-shadow 220ms,
+              color 140ms;
+  position: relative;
+  white-space: nowrap;
+}
+.imaging-btn:active { transform: translateY(1px); }
+.imaging-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.imaging-btn:hover { will-change: transform, box-shadow; }
+
+.imaging-btn-primary {
+  background: var(--color-tool-cyan);
+  color: #06070A;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 0 0 1px rgba(90, 204, 230, 0.5);
+}
+.imaging-btn-primary:hover {
+  background: #7DDCEF;
+  box-shadow: var(--shadow-tool), 0 1px 0 rgba(255, 255, 255, 0.3) inset;
+}
+
+.imaging-btn-ghost {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: var(--color-border-bright);
+  color: var(--color-text);
+}
+.imaging-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--color-border-tool);
+  color: var(--color-tool-cyan);
+}
+
+.imaging-btn-violet {
+  background: linear-gradient(180deg, #B5A0FF 0%, #9B7AFB 100%);
+  color: #0B0814;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 0 0 1px rgba(167, 139, 250, 0.5);
+}
+.imaging-btn-violet:hover {
+  box-shadow: 0 0 24px -6px rgba(167, 139, 250, 0.6), 0 1px 0 rgba(255, 255, 255, 0.3) inset;
+}
+
+/* ---------------------------------------------------------------------------
+ * Tool tile — tactile card with custom SVG illustration
+ * Used by LabHome to render the 2-3 lab features (Cases, Occlusion, etc).
+ * Each tile gets a unique SVG illustration on the right side.
  * --------------------------------------------------------------------------- */
 .imaging-tool-tile {
   position: relative;
   display: flex;
   align-items: stretch;
   gap: 18px;
-  padding: 18px 20px;
-  border-radius: 8px;
+  padding: 20px 22px;
+  border-radius: 14px;
   border: 1px solid var(--color-border);
-  background: var(--color-surface-2);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, transparent 100%),
+    var(--color-surface-2);
   text-decoration: none;
   color: inherit;
   overflow: hidden;
-  transition: border-color 180ms, background-color 180ms;
+  /* Only transform/opacity are GPU-composited; box-shadow + border-color
+     still trigger paint on hover but those fire ONCE per hover, not every
+     frame, so net perf cost is negligible. */
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 220ms,
+              background-color 220ms,
+              box-shadow 320ms;
+  will-change: transform;
+}
+.imaging-tool-tile::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(90, 204, 230, 0.5), transparent 60%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 280ms;
+  pointer-events: none;
 }
 .imaging-tool-tile:hover {
-  border-color: rgba(90, 204, 230, 0.55);
-  background: #161A3D;
+  transform: translateY(-2px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%),
+    var(--color-surface-lift);
+  box-shadow: var(--shadow-lift);
 }
+.imaging-tool-tile:hover::after { opacity: 1; }
+.imaging-tool-tile:hover .imaging-tile-art { color: var(--color-tool-cyan); }
 .imaging-tool-tile:hover .imaging-tile-arrow {
-  transform: translateX(2px);
+  transform: translateX(3px);
   color: var(--color-tool-cyan);
 }
 .imaging-tile-art {
   flex-shrink: 0;
+  color: var(--color-text-muted);
+  transition: color 220ms;
 }
 .imaging-tile-arrow {
   align-self: center;
-  color: var(--color-text-muted);
-  transition: transform 180ms, color 180ms;
+  color: var(--color-text-faint);
+  transition: transform 220ms, color 220ms;
   flex-shrink: 0;
 }
 
 /* ---------------------------------------------------------------------------
- * Lifted VetMock button affordances (vmx-*). Restored to original tokens.
- * Used by DICOM viewer overlays, Norberg/VHS panels, Tag inspector etc.
+ * Capability dot — animated breathing pulse on the brand accent
+ *
+ * Perf-conscious: uses transform: scale() on a pseudo-element ring instead of
+ * box-shadow animation. transform is GPU-composited (no paint per frame) so
+ * 4 dots pulsing continuously cost ~0 CPU vs box-shadow's 4× constant repaint.
+ * --------------------------------------------------------------------------- */
+.imaging-cap-dot {
+  position: relative;
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-tool-cyan);
+  /* Hint the browser to keep this on its own compositor layer */
+  will-change: transform;
+}
+.imaging-cap-dot::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid rgba(90, 204, 230, 0.5);
+  opacity: 0;
+  transform: scale(0.6);
+  animation: imaging-cap-pulse 2.6s ease-out infinite;
+  /* Promote to GPU layer */
+  will-change: transform, opacity;
+}
+.imaging-cap-dot.finalized { background: var(--color-finalized); }
+.imaging-cap-dot.finalized::after {
+  border-color: rgba(52, 211, 153, 0.5);
+}
+@keyframes imaging-cap-pulse {
+  0%   { transform: scale(0.6); opacity: 0.9; }
+  70%  { transform: scale(2.4); opacity: 0; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .imaging-cap-dot::after { animation: none; opacity: 0; }
+}
+
+/* ---------------------------------------------------------------------------
+ * Dropzone — tactile drag target with scan line on hover
+ * --------------------------------------------------------------------------- */
+.imaging-dropzone {
+  position: relative;
+  display: block;
+  cursor: pointer;
+  border-radius: 14px;
+  border: 1px dashed var(--color-border-bright);
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(90, 204, 230, 0.04) 0%, transparent 60%),
+    var(--color-surface-2);
+  transition: border-color 200ms, background-color 220ms, transform 200ms;
+  overflow: hidden;
+}
+.imaging-dropzone:hover {
+  border-color: var(--color-border-tool);
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(90, 204, 230, 0.09) 0%, transparent 60%),
+    var(--color-surface-lift);
+}
+.imaging-dropzone[data-dragging="true"] {
+  border-color: var(--color-tool-cyan);
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(90, 204, 230, 0.16) 0%, transparent 60%),
+    var(--color-surface-lift);
+  transform: scale(1.005);
+}
+/* Scan line overlay on the dropzone — sweeps once on hover */
+.imaging-dropzone::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 0%, rgba(90, 204, 230, 0.12) 50%, transparent 100%);
+  transform: translateY(-100%);
+  transition: transform 1200ms ease-out;
+  pointer-events: none;
+}
+.imaging-dropzone:hover::after,
+.imaging-dropzone[data-dragging="true"]::after {
+  transform: translateY(100%);
+}
+
+/* ---------------------------------------------------------------------------
+ * Lifted VetMock button affordances (vmx-*). Recolored for the new tokens.
+ * Kept for components that still use them (viewer overlays, Tag inspector).
  * --------------------------------------------------------------------------- */
 .vmx-btn {
   display: inline-flex;
@@ -132,8 +402,8 @@ body {
   padding: 6px 11px;
   background: var(--color-surface-2);
   color: var(--color-text);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
+  border: 1px solid var(--color-border-bright);
+  border-radius: 6px;
   cursor: pointer;
   font: inherit;
   font-size: 0.82rem;
@@ -143,8 +413,8 @@ body {
   transition: background-color 120ms, border-color 120ms, color 120ms;
 }
 .vmx-btn:hover {
-  background: #161A3D;
-  border-color: var(--color-tool-cyan);
+  background: var(--color-surface-lift);
+  border-color: var(--color-border-tool);
 }
 .vmx-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
@@ -161,13 +431,13 @@ body {
 .vmx-btn-primary {
   background: var(--color-tool-cyan);
   border-color: var(--color-tool-cyan);
-  color: #0F1232;
+  color: #06070A;
   font-weight: 600;
 }
 .vmx-btn-primary:hover {
   background: #7DDCEF;
   border-color: #7DDCEF;
-  color: #0F1232;
+  color: #06070A;
 }
 
 .vmx-btn-sm { padding: 4px 9px; font-size: 0.78rem; min-height: 32px; }

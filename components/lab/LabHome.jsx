@@ -173,34 +173,39 @@ export default function LabHome() {
   // moves below the hero where it makes sense as a follow-up action
   // rather than the headline.
   return (
-    <div className="relative">
-      {/* Faint DICOM crosshair grid wash behind everything */}
-      <CrosshairPattern className="z-0" opacity={0.035} />
+    <div className="relative imaging-hero-bg">
+      {/* Faint DICOM crosshair grid wash behind everything — kept as clinical signature on top of the new mesh gradient */}
+      <CrosshairPattern className="z-0" opacity={0.028} />
 
-      <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 pt-10 sm:pt-14 pb-10">
+      <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 pt-12 sm:pt-20 pb-10">
         {/* ──── HERO ──── */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-12 items-center mb-14">
+        <section className="grid grid-cols-1 lg:grid-cols-[1.05fr_1fr] gap-10 lg:gap-14 items-center mb-16 sm:mb-20">
           {/* Left: copy + CTAs */}
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[var(--color-tool-cyan)] mb-4">
-              CUVETSMO Imaging · Free for vet students
+            <p className="imaging-eyebrow mb-5">
+              CUVETSMO Imaging Lab · for Y4–Y6 reading clinics
             </p>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[var(--color-text)] leading-[1.1] mb-5">
-              Vet DICOM viewer.<br />
-              <span className="text-[var(--color-tool-cyan)]">Browser-based.</span><br />
-              Free for students.
+            <h1 className="imaging-display text-[2.5rem] sm:text-5xl lg:text-[3.75rem] text-[var(--color-text)] mb-6">
+              Radiographs,<br />
+              <span
+                style={{
+                  background: 'linear-gradient(96deg, #5ACCE6 0%, #A78BFA 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }}
+              >un-blackboxed.</span>
             </h1>
-            <p className="text-base text-[var(--color-text-muted)] leading-relaxed mb-7 max-w-md">
-              เปิดภาพรังสีของหมา-แมวในเบราว์เซอร์ ไม่ส่งภาพขึ้น server, มี overlay Norberg + VHS วินิจฉัย hip dysplasia สำหรับการเรียนการสอน.
+            <p className="text-[15px] sm:text-base text-[var(--color-text-muted)] leading-relaxed mb-8 max-w-[28rem]">
+              เปิดภาพ DICOM ของหมา-แมวใน browser · Norberg + VHS วาดเอง วัดเอง · ไม่ขึ้น server, ไม่ต้อง login.
+              <br />
+              <span className="text-[var(--color-text-faint)]">A diagnostic-reading tool designed for learners, not for hospital dashboards.</span>
             </p>
 
             <div className="flex flex-wrap gap-3">
-              <Link
-                href="/cases"
-                className="inline-flex items-center gap-2 rounded-md bg-[var(--color-tool-cyan)] px-5 py-2.5 text-sm font-semibold text-[var(--color-bg)] hover:bg-[var(--color-tool-cyan)]/90 transition-colors shadow-sm"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" />
+              <Link href="/cases" className="imaging-btn imaging-btn-primary">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <polygon points="5 3 19 12 5 21 5 3" />
                 </svg>
                 เปิด sample case
               </Link>
@@ -210,19 +215,19 @@ export default function LabHome() {
                   e.preventDefault();
                   document.getElementById('dropzone')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }}
-                className="inline-flex items-center gap-2 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] px-5 py-2.5 text-sm font-semibold text-[var(--color-text)] hover:border-[var(--color-tool-cyan)]/60 hover:text-[var(--color-tool-cyan)] transition-colors"
+                className="imaging-btn imaging-btn-ghost"
               >
-                หรือลากไฟล์ DICOM ของคุณ
-                <span aria-hidden>↓</span>
+                หรือลากไฟล์ DICOM
+                <span aria-hidden style={{ display: 'inline-block', transform: 'translateY(1px)' }}>↓</span>
               </a>
             </div>
 
-            {/* Capability strip — text-only, static dots */}
-            <ul className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[var(--color-text-muted)]">
-              <li className="flex items-center gap-1.5"><span aria-hidden className="text-[var(--color-tool-cyan)]">●</span> Norberg angle</li>
-              <li className="flex items-center gap-1.5"><span aria-hidden className="text-[var(--color-tool-cyan)]">●</span> VHS · vertebral heart score</li>
-              <li className="flex items-center gap-1.5"><span aria-hidden className="text-[var(--color-tool-cyan)]">●</span> Image occlusion editor</li>
-              <li className="flex items-center gap-1.5"><span aria-hidden className="text-[var(--color-finalized)]">●</span> ไม่ขึ้น server</li>
+            {/* Capability strip — animated breathing dots */}
+            <ul className="mt-8 flex flex-wrap gap-x-5 gap-y-2.5 text-[12px] text-[var(--color-text-muted)] font-mono">
+              <li className="flex items-center gap-2"><span aria-hidden className="imaging-cap-dot" /> Norberg angle</li>
+              <li className="flex items-center gap-2"><span aria-hidden className="imaging-cap-dot" /> VHS · vertebral heart score</li>
+              <li className="flex items-center gap-2"><span aria-hidden className="imaging-cap-dot" /> Image occlusion editor</li>
+              <li className="flex items-center gap-2"><span aria-hidden className="imaging-cap-dot finalized" /> ไม่ขึ้น server</li>
             </ul>
           </div>
 
@@ -235,13 +240,13 @@ export default function LabHome() {
         </section>
 
         {/* ──── DROPZONE ──── */}
-        <section id="dropzone" className="mb-10 scroll-mt-20">
-          <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--color-text)]">
-              Free Mode · ลาก DICOM ของคุณ
+        <section id="dropzone" className="mb-12 scroll-mt-20">
+          <div className="flex items-baseline justify-between mb-4 flex-wrap gap-2">
+            <h2 className="text-[13px] font-mono uppercase tracking-[0.18em] text-[var(--color-text)] flex items-center gap-2">
+              <span className="text-[var(--color-tool-violet)]">02 /</span> Free Mode — ลาก DICOM ของคุณ
             </h2>
-            <span className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-text-muted)]">
-              Educational, not for clinical decisions
+            <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--color-text-faint)]">
+              Educational tool · not for clinical decisions
             </span>
           </div>
 
@@ -249,24 +254,21 @@ export default function LabHome() {
             onDrop={onDrop}
             onDragOver={onDragOver}
             onDragLeave={onDragLeave}
-            className={`block cursor-pointer rounded-md border-2 border-dashed transition-colors ${
-              dragging
-                ? 'border-[var(--color-tool-cyan)] bg-[rgba(90,204,230,0.08)]'
-                : 'border-[var(--color-border)] bg-[var(--color-surface-2)] hover:border-[var(--color-tool-cyan)]/60'
-            }`}
+            data-dragging={dragging ? 'true' : 'false'}
+            className="imaging-dropzone"
           >
-            <div className="px-6 py-10 sm:py-12 text-center">
-              <div className="inline-flex items-center justify-center w-10 h-10 rounded-md border border-[var(--color-tool-cyan)]/40 bg-[rgba(90,204,230,0.06)] mb-3">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-tool-cyan)]" aria-hidden="true">
+            <div className="px-6 py-12 sm:py-14 text-center relative z-10">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl border border-[var(--color-border-tool)] bg-[rgba(90,204,230,0.06)] mb-4 shadow-[0_0_24px_-8px_rgba(90,204,230,0.4)]">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-tool-cyan)]" aria-hidden="true">
                   <path d="M12 3v12M12 3l-4 4M12 3l4 4" />
                   <path d="M3 17v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2" />
                 </svg>
               </div>
-              <div className="text-sm font-semibold text-[var(--color-text)] mb-1">
-                Drop .dcm file here · หรือคลิกเพื่อเลือก
+              <div className="text-base font-semibold text-[var(--color-text)] mb-1.5 tracking-tight">
+                Drop <code className="font-mono text-[var(--color-tool-cyan)] text-[0.92em]">.dcm</code> file here · หรือคลิกเพื่อเลือก
               </div>
-              <div className="text-xs text-[var(--color-text-muted)]">
-                ครั้งละสูงสุด {MAX_FILES} ไฟล์ (side-by-side study) · render ในเบราว์เซอร์ล้วน ไม่ส่งภาพขึ้น server
+              <div className="text-xs text-[var(--color-text-muted)] max-w-md mx-auto leading-relaxed">
+                ครั้งละสูงสุด {MAX_FILES} ไฟล์ (side-by-side study) · render ในเบราว์เซอร์ล้วน · ไม่ส่งภาพขึ้น server
               </div>
               <input
                 type="file"
@@ -279,15 +281,18 @@ export default function LabHome() {
           </label>
 
           {error && (
-            <p className="text-[var(--color-active-red)] text-sm text-center mt-4">{error}</p>
+            <p className="text-[var(--color-active-red)] text-sm text-center mt-4 font-mono">{error}</p>
           )}
         </section>
 
         {/* ──── TOOL TILES ────
-            Image-art tiles for each lab feature · Pollinations-generated
-            radiographs as illustrations · simple border + arrow nudge on hover.
-            Layout uses the .imaging-tool-tile class kept from Phase 0.5. */}
+            Custom SVG illustrations for each lab feature. Each tile lifts +1px
+            on hover, reveals a cyan gradient ring, and the illustration color
+            shifts to brand cyan. Replaces the old generic icon+text card. */}
         <section className="mb-6">
+          <h2 className="text-[13px] font-mono uppercase tracking-[0.18em] text-[var(--color-text)] mb-4 flex items-center gap-2">
+            <span className="text-[var(--color-tool-violet)]">03 /</span> Other modes
+          </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <ToolTile
               href="/cases"
@@ -551,7 +556,7 @@ function ToolTile({ href, title, desc, meta, art }) {
         <div className="flex items-baseline gap-2 mb-1">
           <span className="font-semibold text-[var(--color-text)] tracking-tight text-[15px]">{title}</span>
           {meta && (
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--color-text-muted)] opacity-70">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--color-text-faint)]">
               {meta}
             </span>
           )}
