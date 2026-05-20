@@ -2,11 +2,17 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import Link from 'next/link';
 
-// CaseLibraryLocal — lifted-and-shifted CaseLibrary minus the Supabase
-// data source. Reads from a static JSON case list at `/cases.json`
-// (fetched at runtime so Palm can update without a rebuild). Each case
-// points at .dcm files under /public/cases/. Falls back to a guided
-// empty state when no cases are registered yet.
+// CaseLibraryLocal — case-listing grid for the dark imaging.cuvetsmo.com theme.
+//
+// 2026-05-20 rewrite: the original component was a copy-paste of VetMock's
+// white-theme CaseLibrary. White card-backgrounds + #666 muted text against
+// the dark page made body text invisible (white-on-white). Palm flagged it
+// as "ตัวหนังสือมองไม่เห็น" — fixed by swapping every inline color to a
+// CSS custom property from `app/globals.css` (--color-surface-2, --color-
+// text-muted, --color-tool-cyan, etc.).
+//
+// Reads from a static JSON case list at `/cases.json` (fetched at runtime
+// so cases can be added without a rebuild via the prebuild sync script).
 
 function modalityToKey(modality) {
   if (!modality) return 'other';
@@ -27,18 +33,52 @@ const MODALITY_TABS = [
   { k: 'other', label: 'Other',       icon: '❓' },
 ];
 
-const badgeBase = {
-  fontSize: '0.65rem',
-  padding: '2px 6px',
-  color: '#fff',
-  borderRadius: 3,
-  whiteSpace: 'nowrap',
-  fontWeight: 600,
-};
-
+// Modality badge colors — kept semantically distinct but desaturated for
+// dark-theme cohesion (no eye-stab saturation on the dark panels).
 function modalityBadgeStyle(k) {
-  const bg = { xray: '#5a7ba8', ct: '#a86b5a', mri: '#7a5aa8', us: '#5aa87a', other: '#888' }[k] || '#888';
-  return { ...badgeBase, background: bg };
+  const palette = {
+    xray:  { bg: 'rgba(90, 204, 230, 0.16)',  border: 'rgba(90, 204, 230, 0.42)',  fg: '#7DDCEF' },
+    ct:    { bg: 'rgba(255, 154, 90, 0.14)',  border: 'rgba(255, 154, 90, 0.38)',  fg: '#FFA56B' },
+    mri:   { bg: 'rgba(167, 139, 250, 0.16)', border: 'rgba(167, 139, 250, 0.42)', fg: '#B7A2FF' },
+    us:    { bg: 'rgba(52, 211, 153, 0.14)',  border: 'rgba(52, 211, 153, 0.38)',  fg: '#5FDDA8' },
+    other: { bg: 'rgba(255, 255, 255, 0.06)', border: 'rgba(255, 255, 255, 0.18)', fg: 'var(--color-text-muted)' },
+  };
+  const c = palette[k] || palette.other;
+  return {
+    fontSize: '0.66rem',
+    padding: '2px 7px',
+    color: c.fg,
+    background: c.bg,
+    border: `1px solid ${c.border}`,
+    borderRadius: 999,
+    whiteSpace: 'nowrap',
+    fontWeight: 600,
+    letterSpacing: 0.1,
+  };
+}
+
+// Difficulty badges — same shape, different semantic colors.
+function difficultyBadgeStyle(d) {
+  if (d === 'advanced') {
+    return {
+      fontSize: '0.66rem', padding: '2px 7px', color: '#FF8FA3',
+      background: 'rgba(255, 77, 109, 0.14)', border: '1px solid rgba(255, 77, 109, 0.38)',
+      borderRadius: 999, whiteSpace: 'nowrap', fontWeight: 600,
+    };
+  }
+  if (d === 'intro') {
+    return {
+      fontSize: '0.66rem', padding: '2px 7px', color: '#5FDDA8',
+      background: 'rgba(52, 211, 153, 0.12)', border: '1px solid rgba(52, 211, 153, 0.34)',
+      borderRadius: 999, whiteSpace: 'nowrap', fontWeight: 600,
+    };
+  }
+  // intermediate / unknown
+  return {
+    fontSize: '0.66rem', padding: '2px 7px', color: 'var(--color-text-muted)',
+    background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.14)',
+    borderRadius: 999, whiteSpace: 'nowrap', fontWeight: 600,
+  };
 }
 
 function modalityShortLabel(k) {
@@ -93,25 +133,35 @@ export default function CaseLibraryLocal() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-        <h2 style={{ fontSize: '1.15rem', margin: 0 }}>📚 Case library</h2>
-        <Link href="/" className="text-sm text-sky-700 hover:text-sky-900 underline underline-offset-4">← back to lab</Link>
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h2 className="text-lg font-semibold text-[var(--color-text)] m-0">📚 Case library</h2>
+        <Link href="/" className="text-sm text-[var(--color-tool-cyan)] hover:text-[#7DDCEF] underline underline-offset-4">
+          ← back to lab
+        </Link>
       </div>
 
       {loading && (
         <div style={gridStyle}>
           {[0, 1, 2].map((i) => (
-            <div key={i} style={{ ...cardStyle, height: 180, animation: 'cuvi-skel-pulse 1.4s ease-in-out infinite', animationDelay: `${i * 0.12}s` }}>
-              <div style={{ height: 14, width: '60%', background: '#e8e8e8', borderRadius: 3, marginBottom: 8 }} />
-              <div style={{ height: 10, width: '85%', background: '#eee', borderRadius: 3, marginBottom: 6 }} />
-              <div style={{ height: 10, width: '70%', background: '#eee', borderRadius: 3, marginBottom: 16 }} />
-              <div style={{ height: 32, width: '100%', background: '#e8e8e8', borderRadius: 4 }} />
+            <div
+              key={i}
+              style={{
+                ...cardStyle,
+                height: 180,
+                animation: 'cuvi-skel-pulse 1.4s ease-in-out infinite',
+                animationDelay: `${i * 0.12}s`,
+              }}
+            >
+              <div style={skelLineLg} />
+              <div style={skelLineMd} />
+              <div style={{ ...skelLineMd, width: '70%', marginBottom: 16 }} />
+              <div style={skelLineBlock} />
             </div>
           ))}
         </div>
       )}
 
-      {error && <div style={errorStyle}>โหลดไม่สำเร็จ: {error}</div>}
+      {error && <div style={errorStyle}>โหลดไม่สำเร็จ — {error}</div>}
 
       {!loading && !error && cases.length > 0 && (
         <div style={tabRowStyle}>
@@ -131,7 +181,9 @@ export default function CaseLibraryLocal() {
                 }}
                 title={isEmpty ? `ยังไม่มี ${t.label} case` : `${t.label} (${count} case)`}
               >
-                {t.icon} {t.label} <span style={{ opacity: 0.7, fontSize: '0.85em' }}>({count})</span>
+                <span aria-hidden style={{ marginRight: 4 }}>{t.icon}</span>
+                {t.label}
+                <span style={{ opacity: 0.65, fontSize: '0.85em', marginLeft: 5 }}>({count})</span>
               </button>
             );
           })}
@@ -141,12 +193,11 @@ export default function CaseLibraryLocal() {
       {!loading && !error && cases.length === 0 && (
         <div style={emptyStyle}>
           <div style={{ fontSize: '2rem', marginBottom: 8 }}>📭</div>
-          <div style={{ fontWeight: 600 }}>ยังไม่มี public case ใน standalone build</div>
-          <div style={{ fontSize: '0.82rem', marginTop: 12, color: '#666', lineHeight: 1.6, maxWidth: 520, margin: '12px auto 0' }}>
+          <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>ยังไม่มี public case ใน library</div>
+          <div style={{ fontSize: '0.82rem', marginTop: 12, color: 'var(--color-text-muted)', lineHeight: 1.6, maxWidth: 520, margin: '12px auto 0' }}>
             ลาก DICOM ของตัวเองได้ที่หน้า{' '}
-            <Link href="/" style={{ color: '#0369a1', textDecoration: 'underline' }}>Imaging Lab</Link> หรือ
-            seed สาธารณะ: วาง <code>.dcm</code> ที่ <code>public/cases/&lt;slug&gt;/</code> +
-            แก้ <code>public/cases.json</code> เพื่อ register case ใหม่.
+            <Link href="/" style={{ color: 'var(--color-tool-cyan)', textDecoration: 'underline' }}>Imaging Lab</Link>
+            {' '}หรือ seed สาธารณะ: วาง <code style={codeStyle}>.dcm</code> ที่ <code style={codeStyle}>public/cases/&lt;slug&gt;/</code> แล้วแก้ <code style={codeStyle}>public/cases.json</code> เพื่อ register case ใหม่
           </div>
         </div>
       )}
@@ -162,7 +213,9 @@ export default function CaseLibraryLocal() {
       {!loading && !error && cases.length > 0 && filtered.length === 0 && (
         <div style={emptyStyle}>
           <div style={{ fontSize: '2rem', marginBottom: 6 }}>📭</div>
-          <div>ยังไม่มี <strong>{modalityShortLabel(modalityFilter)}</strong> case ใน library</div>
+          <div style={{ color: 'var(--color-text)' }}>
+            ยังไม่มี <strong>{modalityShortLabel(modalityFilter)}</strong> case ใน library
+          </div>
         </div>
       )}
     </div>
@@ -171,9 +224,11 @@ export default function CaseLibraryLocal() {
 
 function CaseCard({ caseData }) {
   return (
-    <div style={cardStyle}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6, flexWrap: 'wrap' }}>
-        <h3 style={{ margin: '0 0 4px', fontSize: '0.95rem', flex: '1 1 60%', minWidth: 0 }}>{caseData.title}</h3>
+    <div style={cardStyle} className="hover:border-[var(--color-border-tool)] transition-colors">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+        <h3 style={{ margin: '0 0 4px', fontSize: '0.95rem', fontWeight: 600, flex: '1 1 60%', minWidth: 0, color: 'var(--color-text)', letterSpacing: '-0.01em' }}>
+          {caseData.title}
+        </h3>
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {caseData.modality && (
             <span style={modalityBadgeStyle(modalityToKey(caseData.modality))}>
@@ -182,20 +237,20 @@ function CaseCard({ caseData }) {
             </span>
           )}
           {caseData.difficulty && (
-            <span style={{ ...badgeBase, background: caseData.difficulty === 'advanced' ? '#c0392b' : caseData.difficulty === 'intro' ? '#4a6b4a' : '#888' }}>
+            <span style={difficultyBadgeStyle(caseData.difficulty)}>
               {caseData.difficulty}
             </span>
           )}
         </div>
       </div>
-      <p style={{ margin: '4px 0', fontSize: '0.78rem', color: '#666' }}>
+      <p style={metaLineStyle}>
         {[caseData.species, caseData.signalment, caseData.body_part].filter(Boolean).join(' · ')}
       </p>
       {caseData.history && (
-        <p style={{ margin: '6px 0', fontSize: '0.78rem', color: '#555' }}>{caseData.history}</p>
+        <p style={descLineStyle}>{caseData.history}</p>
       )}
       {caseData.learning_objectives?.length > 0 && (
-        <ul style={{ margin: '6px 0 8px', paddingLeft: 18, fontSize: '0.75rem', color: '#666' }}>
+        <ul style={objListStyle}>
           {caseData.learning_objectives.slice(0, 3).map((obj, i) => <li key={i}>{obj}</li>)}
         </ul>
       )}
@@ -203,15 +258,26 @@ function CaseCard({ caseData }) {
         <div style={licenseRowStyle}>
           {caseData.license && <span>📜 {caseData.license}</span>}
           {caseData.source_url && caseData.source_url !== 'internal' && (
-            <> · <a href={caseData.source_url} target="_blank" rel="noopener noreferrer" style={{ color: '#0369a1', textDecoration: 'underline' }}>source ↗</a></>
+            <>
+              <span aria-hidden style={{ opacity: 0.6 }}>·</span>
+              <a
+                href={caseData.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: 'var(--color-tool-cyan)', textDecoration: 'underline', textUnderlineOffset: 2 }}
+              >
+                source ↗
+              </a>
+            </>
           )}
         </div>
       )}
       <Link
         href={`/cases/${caseData.slug || caseData.id}`}
-        className="inline-block w-full mt-2 px-3 py-2 rounded bg-sky-700 hover:bg-sky-800 text-white text-sm font-medium text-center"
+        style={openCaseBtnStyle}
+        className="hover:bg-[#7DDCEF]"
       >
-        เปิด case
+        เปิด case →
       </Link>
     </div>
   );
@@ -221,16 +287,164 @@ function CaseCard({ caseData }) {
 if (typeof document !== 'undefined' && !document.getElementById('cuvi-skel-keyframes')) {
   const s = document.createElement('style');
   s.id = 'cuvi-skel-keyframes';
-  s.textContent = '@keyframes cuvi-skel-pulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }';
+  s.textContent = '@keyframes cuvi-skel-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.9; } }';
   document.head.appendChild(s);
 }
 
-const errorStyle = { padding: '12px 16px', background: '#fff5f5', border: '1px solid #fcc', borderRadius: 6, color: '#a33', fontSize: '0.85rem' };
-const emptyStyle = { padding: 36, textAlign: 'center', color: '#666', background: '#fafafa', border: '1px dashed #ccc', borderRadius: 8 };
-const gridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 };
-const cardStyle = { border: '1px solid #ddd', borderRadius: 8, padding: 14, background: '#fff' };
-const tabRowStyle = { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12, padding: '6px 0', borderBottom: '1px solid #eee' };
-const tabBtnStyle = { padding: '6px 12px', background: '#fff', border: '1px solid #ccc', borderRadius: 6, cursor: 'pointer', fontSize: '0.82rem', whiteSpace: 'nowrap', minHeight: 32 };
-const tabBtnActiveStyle = { background: '#0369a1', color: '#fff', borderColor: '#075985' };
-const tabBtnEmptyStyle = { opacity: 0.45, cursor: 'not-allowed' };
-const licenseRowStyle = { margin: '6px 0', padding: '6px 8px', background: '#f8f8f8', borderRadius: 4, fontSize: '0.7rem', color: '#666', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 4 };
+// ── Dark-theme style atoms ─────────────────────────────────────────────────
+
+const errorStyle = {
+  padding: '12px 16px',
+  background: 'rgba(255, 77, 109, 0.10)',
+  border: '1px solid rgba(255, 77, 109, 0.32)',
+  borderRadius: 8,
+  color: '#FF8FA3',
+  fontSize: '0.85rem',
+};
+
+const emptyStyle = {
+  padding: 36,
+  textAlign: 'center',
+  background: 'var(--color-surface-2)',
+  border: '1px dashed var(--color-border-bright)',
+  borderRadius: 12,
+  color: 'var(--color-text-muted)',
+};
+
+const gridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+  gap: 12,
+};
+
+const cardStyle = {
+  border: '1px solid var(--color-border)',
+  borderRadius: 10,
+  padding: 16,
+  background: 'var(--color-surface-2)',
+  display: 'flex',
+  flexDirection: 'column',
+};
+
+const tabRowStyle = {
+  display: 'flex',
+  gap: 6,
+  flexWrap: 'wrap',
+  marginBottom: 14,
+  paddingBottom: 10,
+  borderBottom: '1px solid var(--color-border)',
+};
+
+const tabBtnStyle = {
+  padding: '6px 12px',
+  background: 'var(--color-surface-2)',
+  color: 'var(--color-text-muted)',
+  border: '1px solid var(--color-border-bright)',
+  borderRadius: 999,
+  cursor: 'pointer',
+  fontSize: '0.8rem',
+  fontWeight: 500,
+  whiteSpace: 'nowrap',
+  minHeight: 32,
+  display: 'inline-flex',
+  alignItems: 'center',
+  transition: 'border-color 140ms, color 140ms, background-color 140ms',
+};
+
+const tabBtnActiveStyle = {
+  background: 'var(--color-tool-cyan)',
+  color: '#06070A',
+  borderColor: 'var(--color-tool-cyan)',
+  fontWeight: 600,
+};
+
+// Disabled tabs: keep readable (0.7 not 0.45) — Palm flagged old 0.45 made
+// them effectively invisible against the dark page bg.
+const tabBtnEmptyStyle = {
+  opacity: 0.7,
+  cursor: 'not-allowed',
+  color: 'var(--color-text-muted)',
+  background: 'transparent',
+  borderStyle: 'dashed',
+};
+
+const metaLineStyle = {
+  margin: '0 0 6px',
+  fontSize: '0.78rem',
+  color: 'var(--color-text-muted)',
+  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+  letterSpacing: 0.1,
+};
+
+const descLineStyle = {
+  margin: '6px 0',
+  fontSize: '0.82rem',
+  color: 'var(--color-text)',
+  lineHeight: 1.55,
+};
+
+const objListStyle = {
+  margin: '6px 0 10px',
+  paddingLeft: 18,
+  fontSize: '0.76rem',
+  color: 'var(--color-text-muted)',
+  lineHeight: 1.55,
+};
+
+const licenseRowStyle = {
+  margin: '6px 0 10px',
+  padding: '6px 10px',
+  background: 'rgba(255, 255, 255, 0.025)',
+  border: '1px solid var(--color-border)',
+  borderRadius: 6,
+  fontSize: '0.7rem',
+  color: 'var(--color-text-muted)',
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  gap: 6,
+};
+
+const codeStyle = {
+  background: 'rgba(90, 204, 230, 0.10)',
+  color: 'var(--color-tool-cyan)',
+  padding: '1px 5px',
+  borderRadius: 3,
+  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+  fontSize: '0.92em',
+};
+
+const openCaseBtnStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 4,
+  width: '100%',
+  marginTop: 'auto',
+  padding: '9px 12px',
+  borderRadius: 8,
+  background: 'var(--color-tool-cyan)',
+  color: '#06070A',
+  fontSize: '0.85rem',
+  fontWeight: 600,
+  textAlign: 'center',
+  textDecoration: 'none',
+  letterSpacing: '-0.005em',
+  transition: 'background-color 140ms',
+};
+
+const skelLineLg = {
+  height: 14, width: '60%',
+  background: 'var(--color-border-bright)',
+  borderRadius: 4, marginBottom: 8,
+};
+const skelLineMd = {
+  height: 10, width: '85%',
+  background: 'var(--color-border)',
+  borderRadius: 4, marginBottom: 6,
+};
+const skelLineBlock = {
+  height: 36, width: '100%',
+  background: 'var(--color-border-bright)',
+  borderRadius: 6,
+};
