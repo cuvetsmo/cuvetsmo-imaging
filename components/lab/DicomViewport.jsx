@@ -16,15 +16,22 @@ import { ensureCornerstoneInit, getDicomImageLoader } from '../../lib/dicom/corn
 import NorbergOverlay from './NorbergOverlay.jsx';
 import VHSOverlay from './VHSOverlay.jsx';
 import AIOverlay from './AIOverlay.jsx';
+import ShortcutCheatsheet from './ShortcutCheatsheet.jsx';
 import { useMediaQuery } from '../../lib/dicom/use-media-query.js';
+import {
+  WL_PRESETS,
+  WL_PRESET_DICOM,
+  wlToVoiRange,
+  formatPresetToast,
+} from '../../lib/dicom/wl-presets';
 
-const PRESETS = [
-  { id: 'smart',   label: '🪄 Auto',  voi: 'compute' },
-  { id: 'default', label: 'DICOM',    voi: 'reset' },
-  { id: 'soft',    label: 'Soft',     voi: { lower: 1000, upper: 3000 } },
-  { id: 'bone',    label: 'Bone',     voi: { lower: 2200, upper: 3800 } },
-  { id: 'lung',    label: 'Lung',     voi: { lower: 200,  upper: 1500 } },
-];
+// PRESETS = clinical W/L list (Bone · Soft · Lung · Auto) + DICOM reset.
+// Numeric values are HU-based standard radiology presets — see
+// lib/dicom/wl-presets.ts for textbook citations. For uncalibrated
+// radiographs the Auto path (P1-P99 quantile) is the more useful
+// default; the textbook values can look very high-contrast on raw
+// DR pixel data, which is expected behavior.
+const PRESETS = [...WL_PRESETS, WL_PRESET_DICOM];
 
 // Sample the pixel histogram + set voiRange from P1–P99. Way more
 // reliable than the DICOM-tag default (which is often the full bit
@@ -58,12 +65,17 @@ function applySmartContrast(viewport) {
 // The id is what activeTool state holds; class.toolName is what
 // Cornerstone stores in its tool group registry. `short` is used as
 // the abbreviated label on narrow viewports.
+//
+// Note on shortcut keys: `L` and `A` are reserved for the W/L preset
+// family (L = Lung, A = Auto W/L) per the Phase 2 brief — they're the
+// canonical single-key bindings clinicians expect. Length is rebound
+// to `M` (Measure) and Angle to `G` (Geometric/angle).
 const TOOLS = {
   wl:     { cls: WindowLevelTool, label: '🌓 W/L',    short: '🌓 W', sk: 'W' },
   pan:    { cls: PanTool,         label: '✋ Pan',     short: '✋ P', sk: 'P' },
   zoom:   { cls: ZoomTool,        label: '🔍 Zoom',    short: '🔍 Z', sk: 'Z' },
-  length: { cls: LengthTool,      label: '📏 Length',  short: '📏 L', sk: 'L' },
-  angle:  { cls: AngleTool,       label: '📐 Angle',   short: '📐 A', sk: 'A' },
+  length: { cls: LengthTool,      label: '📏 Length',  short: '📏 M', sk: 'M' },
+  angle:  { cls: AngleTool,       label: '📐 Angle',   short: '📐 G', sk: 'G' },
 };
 
 let engineSeq = 0;
@@ -141,7 +153,12 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
         // back silently to the DICOM-tag default if csImage isn't
         // ready yet (rare; happens with stack-loader race conditions).
         requestAnimationFrame(() => {
-          if (!cancelled) applySmartContrast(viewport);
+          if (cancelled) return;
+          const ok = applySmartContrast(viewport);
+          // Mark Auto as the initial active preset only if it
+          // actually applied; on failure the DICOM-tag default
+          // wins and no preset is "active".
+          if (ok) setActivePreset('auto');
         });
 
         if (cancelled) return;
@@ -226,19 +243,75 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
     }
   }, []);
 
+  // Active preset = which W/L preset button gets the cyan ring.
+  // `null` while smart-W/L initial compute is in flight or after the
+  // user has manually adjusted W/L via the WindowLevelTool drag.
+  const [activePreset, setActivePreset] = useState(null);
+  // Ephemeral toast at bottom-center — fades after ~1.2 s. Cleared by
+  // ID so rapid preset taps replace the previous toast instead of
+  // queueing up.
+  const [toast, setToast] = useState(null); // { id, message }
+  const toastTimerRef = useRef(null);
+
+  const showToast = useCallback((message) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    const id = Date.now() + Math.random();
+    setToast({ id, message });
+    toastTimerRef.current = setTimeout(() => {
+      setToast((cur) => (cur && cur.id === id ? null : cur));
+      toastTimerRef.current = null;
+    }, 1200);
+  }, []);
+
+  useEffect(() => () => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+  }, []);
+
   const applyPreset = useCallback((preset) => {
     const engine = engineRef.current;
     if (!engine) return;
     const viewport = engine.getViewport(viewportIdRef.current);
     if (!viewport) return;
-    if (preset.voi === 'reset') {
+    if (preset.isReset) {
       viewport.resetProperties();
       viewport.render();
-    } else if (preset.voi === 'compute') {
-      applySmartContrast(viewport);
-    } else {
-      viewport.setProperties({ voiRange: { lower: preset.voi.lower, upper: preset.voi.upper } });
+      setActivePreset(preset.id);
+      showToast(formatPresetToast(preset));
+      return;
+    }
+    if (preset.isAuto) {
+      const ok = applySmartContrast(viewport);
+      if (ok) {
+        setActivePreset(preset.id);
+        showToast(formatPresetToast(preset));
+      }
+      return;
+    }
+    if (!preset.values) return;
+    const voi = wlToVoiRange(preset.values);
+    viewport.setProperties({ voiRange: voi });
+    viewport.render();
+    setActivePreset(preset.id);
+    showToast(formatPresetToast(preset));
+  }, [showToast]);
+
+  // 10% zoom step per "+"/"-" press. Cornerstone3D exposes
+  // get/setZoom on StackViewport — programmatic zoom plays nicely
+  // with the existing ZoomTool mouse binding (they both modify the
+  // camera parallelScale). Multiplicative steps keep the visual
+  // feel of holding "+" consistent at any zoom level.
+  const zoomBy = useCallback((factor) => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const viewport = engine.getViewport(viewportIdRef.current);
+    if (!viewport || typeof viewport.getZoom !== 'function') return;
+    try {
+      const z = viewport.getZoom();
+      viewport.setZoom(z * factor);
       viewport.render();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[zoomBy] error:', err);
     }
   }, []);
 
@@ -250,7 +323,9 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
     viewport.resetCamera();
     viewport.resetProperties();
     viewport.render();
-  }, []);
+    setActivePreset(null);
+    showToast('Reset view');
+  }, [showToast]);
 
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [aiPrediction, setAiPrediction] = useState(null);
@@ -392,53 +467,138 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
   }, [syncEnabled, status]);
 
   // Keyboard shortcuts. Bound at the window level but skip when the
-  // user is typing in a form input (so VetMock's other views aren't
-  // hijacked by single letters). Each viewport mounts its own listener
-  // — with 2 viewports they both respond to a keypress, which gives
-  // pseudo-sync tool switching for free.
+  // user is typing in a form input (so other views aren't hijacked
+  // by single letters). Each viewport mounts its own listener — with
+  // 2 viewports they both respond to a keypress, which gives pseudo-
+  // sync tool switching for free.
+  //
+  // Brief-mandated bindings (Phase 2):
+  //   b/s/l/a → W/L presets (Bone · Soft · Lung · Auto)
+  //   +/-     → zoom in / out (10% step)
+  //   r       → reset view (camera + voiRange)
+  //   ?       → toggle cheatsheet overlay
+  //   Esc     → close cheatsheet
+  //
+  // Length/Angle shortcuts moved to `m`/`g` to free up `l`/`a` for
+  // the W/L family per brief.
   useEffect(() => {
     if (status !== 'ready') return;
+    // Build a quick lookup from preset shortcut → preset for the
+    // brief-mandated single-letter bindings.
+    const presetByKey = Object.fromEntries(
+      WL_PRESETS.filter((p) => p.shortcut).map((p) => [p.shortcut, p])
+    );
     const onKey = (e) => {
       const t = e.target;
       if (!t) return;
       if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return;
+      // Don't hijack OS / browser shortcuts (Cmd+L, Ctrl+R, etc).
       if (e.altKey || e.ctrlKey || e.metaKey) return;
       const k = e.key.toLowerCase();
       const sk = e.shiftKey;
-      const map = {
-        w: () => selectTool('wl'),
-        p: () => selectTool('pan'),
-        z: () => selectTool('zoom'),
-        l: () => selectTool('length'),
-        a: () => selectTool('angle'),
-        n: () => selectTool('norberg'),
-        v: () => selectTool('vhs'),
-        r: () => resetView(),
-        c: () => clearMeasurements(),
-        e: () => exportPng(),
-        f: () => toggleFullscreen(),
-        u: () => {
-          // Send to whichever overlay is currently active (Norberg or VHS).
-          // The overlay's own `active` check filters out stale instances.
-          try { window.dispatchEvent(new CustomEvent('vmx-lab-undo-point')); } catch { /* noop */ }
-        },
-        '1': () => applyPreset(PRESETS[0]),  // 🪄 Auto
-        '2': () => applyPreset(PRESETS[1]),  // DICOM
-        '3': () => applyPreset(PRESETS[2]),  // Soft
-        '4': () => applyPreset(PRESETS[3]),  // Bone
-        '5': () => applyPreset(PRESETS[4]),  // Lung
-        '?': () => setShowShortcuts((s) => !s),
-        '/': () => sk && setShowShortcuts((s) => !s),
-        escape: () => setShowShortcuts(false),
+
+      // Tool switches (single letters). Length/Angle moved to m/g
+      // so L and A are free for the W/L preset family.
+      const toolMap = {
+        w: 'wl',
+        p: 'pan',
+        z: 'zoom',
+        m: 'length',
+        g: 'angle',
+        n: 'norberg',
+        v: 'vhs',
       };
-      const fn = map[k];
-      if (!fn) return;
-      fn();
-      e.preventDefault();
+      if (toolMap[k]) {
+        selectTool(toolMap[k]);
+        e.preventDefault();
+        return;
+      }
+
+      // W/L preset shortcuts (b/s/l/a) per brief.
+      if (presetByKey[k]) {
+        applyPreset(presetByKey[k]);
+        e.preventDefault();
+        return;
+      }
+
+      // Zoom in/out. `+` arrives as "=" without shift on US keyboards;
+      // handle both raw keys and the post-shift forms.
+      if (k === '+' || (k === '=' && !sk) || (k === '=' && sk)) {
+        zoomBy(1.1);
+        e.preventDefault();
+        return;
+      }
+      if (k === '-' || k === '_') {
+        zoomBy(1 / 1.1);
+        e.preventDefault();
+        return;
+      }
+
+      // Numbered preset shortcuts (1-5) — kept as a parallel path
+      // for muscle memory from the previous version of the toolbar.
+      // Preset order: Bone(1) Soft(2) Lung(3) Auto(4) DICOM(5).
+      if (k >= '1' && k <= '5') {
+        const idx = parseInt(k, 10) - 1;
+        if (PRESETS[idx]) applyPreset(PRESETS[idx]);
+        e.preventDefault();
+        return;
+      }
+
+      switch (k) {
+        case 'r':
+          resetView();
+          e.preventDefault();
+          return;
+        case 'c':
+          clearMeasurements();
+          showToast('Cleared measurements');
+          e.preventDefault();
+          return;
+        case 'e':
+          exportPng();
+          e.preventDefault();
+          return;
+        case 'f':
+          toggleFullscreen();
+          e.preventDefault();
+          return;
+        case 'u':
+          try { window.dispatchEvent(new CustomEvent('vmx-lab-undo-point')); } catch { /* noop */ }
+          e.preventDefault();
+          return;
+        case '?':
+          setShowShortcuts((s) => !s);
+          e.preventDefault();
+          return;
+        case '/':
+          if (sk) {
+            setShowShortcuts((s) => !s);
+            e.preventDefault();
+          }
+          return;
+        case 'escape':
+          setShowShortcuts(false);
+          // Don't preventDefault — Esc may also be used by browser
+          // fullscreen exit, and the ShortcutCheatsheet has its own
+          // capturing Esc handler when open.
+          return;
+        default:
+          return;
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [status, selectTool, resetView, clearMeasurements, exportPng, applyPreset, toggleFullscreen]);
+  }, [
+    status,
+    selectTool,
+    resetView,
+    clearMeasurements,
+    exportPng,
+    applyPreset,
+    toggleFullscreen,
+    zoomBy,
+    showToast,
+  ]);
 
   return (
     <div>
@@ -460,11 +620,22 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
           <TBtn onClick={clearMeasurements} title="Clear all measurements (C)">{isMobile ? '🗑' : '🗑 Clear'}</TBtn>
           <Divider />
           {!isMobile && <span style={labelStyle}>W/L:</span>}
-          {PRESETS.map((p, i) => (
-            <TBtn key={p.id} onClick={() => applyPreset(p)} title={`${p.label} preset — shortcut (${i + 1})`}>
-              {p.label}
-            </TBtn>
-          ))}
+          {PRESETS.map((p, i) => {
+            const sk = p.shortcut ? p.shortcut.toUpperCase() : String(i + 1);
+            const title = `${p.label} — ${p.description}${p.shortcut ? ` (${sk})` : ''}`;
+            const isActive = activePreset === p.id;
+            return (
+              <TBtn
+                key={p.id}
+                active={isActive}
+                preset
+                onClick={() => applyPreset(p)}
+                title={title}
+              >
+                {p.label}
+              </TBtn>
+            );
+          })}
           <Divider />
           {!isMobile && <span style={labelStyle}>Vet:</span>}
           <TBtn active={activeTool === 'norberg'} onClick={() => selectTool('norberg')} title="Norberg angle (N) — 4-click">
@@ -500,39 +671,11 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
         </div>
       )}
 
-      {showShortcuts && (
-        <div style={shortcutsModalStyle} onClick={() => setShowShortcuts(false)}>
-          <div style={shortcutsContentStyle} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <strong>⌨ Keyboard shortcuts</strong>
-              <button onClick={() => setShowShortcuts(false)} style={{ width: 26, height: 26, border: '1px solid #ccc', background: '#fff', borderRadius: 4, cursor: 'pointer' }}>✕</button>
-            </div>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-              <tbody>
-                <SC k="W" desc="Window/Level tool" />
-                <SC k="P" desc="Pan tool" />
-                <SC k="Z" desc="Zoom tool" />
-                <SC k="L" desc="Length measurement" />
-                <SC k="A" desc="Angle measurement" />
-                <SC k="N" desc="🦴 Norberg angle" />
-                <SC k="V" desc="📐 VHS" />
-                <SC k="1 – 5" desc="W/L presets (Auto · DICOM · Soft · Bone · Lung)" />
-                <SC k="R" desc="Reset view (zoom/pan/window)" />
-                <SC k="C" desc="Clear all measurements" />
-                <SC k="U" desc="Undo last Norberg/VHS point" />
-                <SC k="(drag)" desc="ลากจุด Norberg/VHS ที่วางแล้ว = ปรับตำแหน่ง" />
-                <SC k="E" desc="Export annotated PNG" />
-                <SC k="F" desc="Toggle fullscreen" />
-                <SC k="?" desc="Show / hide this help" />
-                <SC k="Esc" desc="Close this help" />
-              </tbody>
-            </table>
-            <div style={{ fontSize: '0.7rem', color: '#888', marginTop: 10 }}>
-              Shortcuts ทำงานเมื่อโฟกัสไม่ได้อยู่ใน input/textarea · ใน study mode (2 viewports) shortcut จะ apply กับทั้งสองอันพร้อมกัน
-            </div>
-          </div>
-        </div>
-      )}
+      <ShortcutCheatsheet
+        open={showShortcuts}
+        onClose={() => setShowShortcuts(false)}
+        sections={cheatsheetSections}
+      />
       <div
         ref={elRef}
         onContextMenu={(e) => e.preventDefault()}
@@ -598,10 +741,11 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
             role="status"
           >
             💡 <strong>ลองวัด:</strong>{' '}
-            กด <kbd style={kbdInlineStyle}>N</kbd> Norberg ·{' '}
-            <kbd style={kbdInlineStyle}>V</kbd> VHS ·{' '}
-            <kbd style={kbdInlineStyle}>L</kbd> Length{' '}
-            <span style={{ opacity: 0.7, fontSize: '0.78em' }}> · กด <kbd style={kbdInlineStyle}>?</kbd> ดูทั้งหมด</span>
+            กด <kbd style={kbdInlineStyle}>N</kbd> Norberg,{' '}
+            <kbd style={kbdInlineStyle}>V</kbd> VHS,{' '}
+            <kbd style={kbdInlineStyle}>M</kbd> Length — W/L{' '}
+            <kbd style={kbdInlineStyle}>B</kbd>/<kbd style={kbdInlineStyle}>S</kbd>/<kbd style={kbdInlineStyle}>L</kbd>/<kbd style={kbdInlineStyle}>A</kbd>{' '}
+            <span style={{ opacity: 0.7, fontSize: '0.78em' }}>· กด <kbd style={kbdInlineStyle}>?</kbd> ดูทั้งหมด</span>
           </div>
         )}
         {status === 'ready' && (
@@ -620,6 +764,19 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
             caseId={caseId}
             species={species}
           />
+        )}
+        {/* Ephemeral toast — keyed on toast.id so each new toast
+            restarts the CSS animation rather than continuing the
+            previous one. */}
+        {toast && (
+          <div
+            key={toast.id}
+            style={toastStyle}
+            aria-live="polite"
+            role="status"
+          >
+            {toast.message}
+          </div>
         )}
       </div>
       {meta && status === 'ready' && (
@@ -640,15 +797,28 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
   );
 }
 
-function TBtn({ active, onClick, children, title }) {
-  return (
-    <button
-      onClick={onClick}
-      title={title}
-      style={{
-        // Min-height 36 keeps it tappable on mobile per WCAG 2.5.5
-        // (Target Size 44×44 is AAA; AA is 24×24 — we land in between
-        // because the toolbar would explode at full AAA).
+function TBtn({ active, onClick, children, title, preset, ariaPressed }) {
+  // Preset buttons use a cyan ring (rather than green-bg) for the
+  // "currently applied preset" indication — visually distinct from
+  // the "currently selected tool" green-bg state. Matches the brief
+  // and pairs with the OHIF-dark clinical theme of the imaging lab.
+  const style = preset
+    ? {
+        minHeight: 36,
+        padding: '6px 11px',
+        background: '#fff',
+        color: '#333',
+        border: '1px solid #ccc',
+        borderRadius: 4,
+        cursor: 'pointer',
+        fontSize: '0.82rem',
+        whiteSpace: 'nowrap',
+        lineHeight: 1.3,
+        // Cyan ring when this preset is the active one.
+        boxShadow: active ? '0 0 0 2px #06b6d4, 0 0 0 4px rgba(6,182,212,0.18)' : 'none',
+        outline: 'none',
+      }
+    : {
         minHeight: 36,
         padding: '6px 11px',
         background: active ? '#4a6b4a' : '#fff',
@@ -659,21 +829,16 @@ function TBtn({ active, onClick, children, title }) {
         fontSize: '0.82rem',
         whiteSpace: 'nowrap',
         lineHeight: 1.3,
-      }}
+      };
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      aria-pressed={ariaPressed ?? (preset ? !!active : undefined)}
+      style={style}
     >
       {children}
     </button>
-  );
-}
-
-function SC({ k, desc }) {
-  return (
-    <tr style={{ borderBottom: '1px solid #eee' }}>
-      <td style={{ padding: '6px 8px', width: 110 }}>
-        <kbd style={kbdStyle}>{k}</kbd>
-      </td>
-      <td style={{ padding: '6px 8px', color: '#444' }}>{desc}</td>
-    </tr>
   );
 }
 
@@ -731,37 +896,94 @@ if (typeof document !== 'undefined' && !document.getElementById('vmx-lab-hint-ke
   document.head.appendChild(s);
 }
 
-const kbdStyle = {
-  display: 'inline-block',
-  padding: '2px 8px',
-  background: '#f4f4f4',
-  border: '1px solid #ccc',
-  borderRadius: 3,
-  fontFamily: 'monospace',
-  fontSize: '0.75rem',
-  color: '#333',
+// Ephemeral preset/action toast — bottom-center, ~1.2 s fade. The
+// toast is pointer-events: none so it never blocks clicks on the
+// underlying canvas (clinician can keep working while the label
+// glides in/out).
+const toastStyle = {
+  position: 'absolute',
+  bottom: 22,
+  left: '50%',
+  transform: 'translateX(-50%)',
+  zIndex: 25,
+  background: 'rgba(15, 23, 42, 0.92)', // slate-900 / 92% — works against bright + dark canvases
+  color: '#fff',
+  padding: '8px 16px',
+  borderRadius: 999,
+  fontSize: '0.85rem',
+  fontWeight: 500,
+  letterSpacing: '0.01em',
+  pointerEvents: 'none',
+  boxShadow: '0 4px 16px rgba(0,0,0,0.32)',
+  // Subtle fade-in/out across the 1.2 s lifetime.
+  animation: 'vmx-lab-toast-fade 1200ms ease-in-out forwards',
+  whiteSpace: 'nowrap',
+  maxWidth: 'calc(100% - 32px)',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
 };
 
-const shortcutsModalStyle = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(0,0,0,0.4)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 2000,
-};
+// Keyframes for toast fade — registered once at module level.
+if (typeof document !== 'undefined' && !document.getElementById('vmx-lab-toast-keyframes')) {
+  const s = document.createElement('style');
+  s.id = 'vmx-lab-toast-keyframes';
+  s.textContent = '@keyframes vmx-lab-toast-fade { 0% { opacity: 0; transform: translateX(-50%) translateY(6px); } 12% { opacity: 1; transform: translateX(-50%) translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-4px); } }';
+  document.head.appendChild(s);
+}
 
-const shortcutsContentStyle = {
-  background: '#fff',
-  borderRadius: 8,
-  padding: '16px 18px',
-  minWidth: 320,
-  maxWidth: '90vw',
-  maxHeight: '85vh',
-  overflow: 'auto',
-  boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
-};
+// Cheatsheet content — passed to ShortcutCheatsheet as structured
+// sections. Sectioned (W/L · Tools · View · Help) so the 2-column
+// grid is scannable rather than a flat dump. Length/Angle reflect
+// the m/g remap; W/L family uses brief-mandated b/s/l/a.
+const cheatsheetSections = [
+  {
+    title: 'W/L presets',
+    rows: [
+      { key: 'B', desc: '🦴 Bone — WW 2000 / WL 500' },
+      { key: 'S', desc: '🫀 Soft tissue — WW 400 / WL 40' },
+      { key: 'L', desc: '🫁 Lung — WW 1500 / WL -500' },
+      { key: 'A', desc: '🪄 Auto — smart contrast (P1-P99)' },
+      { key: '1 – 5', desc: 'Preset by index (Bone · Soft · Lung · Auto · DICOM)' },
+    ],
+  },
+  {
+    title: 'Tools',
+    rows: [
+      { key: 'W', desc: 'Window/Level tool' },
+      { key: 'P', desc: 'Pan tool' },
+      { key: 'Z', desc: 'Zoom tool' },
+      { key: 'M', desc: '📏 Length measurement' },
+      { key: 'G', desc: '📐 Angle measurement' },
+      { key: 'N', desc: '🦴 Norberg angle' },
+      { key: 'V', desc: '💗 VHS' },
+    ],
+  },
+  {
+    title: 'View',
+    rows: [
+      { key: '+', desc: 'Zoom in (10% step)' },
+      { key: '-', desc: 'Zoom out (10% step)' },
+      { key: 'R', desc: 'Reset view (zoom · pan · W/L)' },
+      { key: 'F', desc: 'Toggle fullscreen' },
+      { key: 'E', desc: 'Export annotated PNG' },
+    ],
+  },
+  {
+    title: 'Annotation',
+    rows: [
+      { key: 'C', desc: 'Clear all measurements' },
+      { key: 'U', desc: 'Undo last Norberg/VHS point' },
+      { key: '(drag)', desc: 'ลากจุด Norberg/VHS ที่วางแล้ว = ปรับตำแหน่ง' },
+    ],
+  },
+  {
+    title: 'Help',
+    rows: [
+      { key: '?', desc: 'Toggle this cheatsheet' },
+      { key: 'Esc', desc: 'Close cheatsheet' },
+    ],
+  },
+];
 
 function Divider() {
   return <span style={{ width: 1, height: 22, background: '#ccc', margin: '0 4px' }} />;

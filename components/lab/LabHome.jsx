@@ -265,10 +265,12 @@ export default function LabHome() {
                 </svg>
               </div>
               <div className="text-base font-semibold text-[var(--color-text)] mb-1.5 tracking-tight">
-                Drop <code className="font-mono text-[var(--color-tool-cyan)] text-[0.92em]">.dcm</code> file here · หรือคลิกเพื่อเลือก
+                Drop <code className="font-mono text-[var(--color-tool-cyan)] text-[0.92em]">.dcm</code> file here, หรือคลิกเพื่อเลือก
               </div>
               <div className="text-xs text-[var(--color-text-muted)] max-w-md mx-auto leading-relaxed">
-                ครั้งละสูงสุด {MAX_FILES} ไฟล์ (side-by-side study) · render ในเบราว์เซอร์ล้วน · ไม่ส่งภาพขึ้น server
+                สูงสุด {MAX_FILES} ไฟล์ต่อครั้ง (side-by-side study)
+                <br />
+                render ในเบราว์เซอร์ล้วน ไม่ส่งภาพขึ้น server
               </div>
               <input
                 type="file"
@@ -297,8 +299,8 @@ export default function LabHome() {
             <ToolTile
               href="/cases"
               title="Case Library"
-              desc="Curated CC-BY radiographs · X-ray · CT · MR · US"
-              meta="17 cases · grows weekly"
+              desc="Curated CC-BY radiographs across X-ray, CT, MR, US"
+              meta="16 cases, grows weekly"
               art={
                 /* Real Pollinations-generated canine skeleton lateral · cropped to fit tile */
                 <div className="relative w-[110px] h-[68px] rounded-md overflow-hidden bg-black ring-1 ring-[var(--color-border-bright)]">

@@ -13,6 +13,7 @@ import Link from 'next/link';
 import type { ImagingCase } from '@/lib/cases';
 import { RecallInputCard } from './RecallInputCard';
 import { RevealedCard } from './RevealedCard';
+import { DDxRankerCard } from './DDxRankerCard';
 
 const DicomViewport = lazy(() => import('@/components/lab/DicomViewport.jsx'));
 
@@ -27,6 +28,16 @@ type AttemptRecord = {
   confidence: 1 | 2 | 3 | 4 | 5;
   revealedAt: string | null; // ISO timestamp, null if user hasn't revealed yet
   lastEditedAt: string;       // ISO of last note edit (useful for future SRS)
+  // ── DDx Ranker outcome (added 2026-05-20) ──
+  // Optional · only present after the student submits the ranker step.
+  // We persist alongside notes so the student can see prior attempts
+  // when re-doing a case. Schema is forward-compatible: missing field
+  // means "ranker not attempted yet" or pre-Phase-2 attempt.
+  dxRanking?: {
+    student: string[];      // student's top-3 names, in their ranked order
+    score: 0 | 1 | 2 | 3;   // bucketed score for headline display
+    rankedAt: string;       // ISO submission timestamp
+  };
 };
 
 type AttemptStore = Record<string, AttemptRecord>;
@@ -56,7 +67,10 @@ function writeAttempt(slug: string, record: AttemptRecord) {
 }
 
 type Status = 'loading' | 'ready' | 'not-found' | 'error';
-type Mode = 'recall' | 'revealed';
+// `ranking` is the new intermediate step between recall + revealed. It's
+// only entered when the case has a non-empty `recall.ddx` array AND the
+// student went through the recall reveal flow (not skip-recall).
+type Mode = 'recall' | 'ranking' | 'revealed';
 
 export function CaseDetailView({ caseId }: { caseId: string }) {
   // ── case loading ──
@@ -148,7 +162,23 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
     };
   }, [studentNotes, confidence, caseMeta]);
 
-  // Reveal — stamp revealedAt + flip mode.
+  // Helper — scroll the reveal/ranker anchor into view on mobile.
+  const scrollToAnchor = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    requestAnimationFrame(() => {
+      document
+        .getElementById('reveal-anchor')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, []);
+
+  // Whether this case has any DDx to rank against. Cases with an empty
+  // (or missing) ddx array auto-skip the ranker step entirely.
+  const hasRankableDdx = !!(caseMeta?.recall?.ddx && caseMeta.recall.ddx.length > 0);
+
+  // Reveal — stamp revealedAt + flip mode. If the case has a populated
+  // DDx, we route to the new `ranking` step first; otherwise we go
+  // straight to the standard compare view.
   const reveal = useCallback(() => {
     if (!caseMeta) return;
     const prior = readAttempts()[caseMeta.slug];
@@ -157,24 +187,48 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
       confidence,
       revealedAt: new Date().toISOString(),
       lastEditedAt: prior?.lastEditedAt ?? new Date().toISOString(),
+      dxRanking: prior?.dxRanking,
     });
-    setMode('revealed');
-    // Scroll the reveal card into view on mobile — the user just tapped
-    // a button that may be off-screen relative to the new content area.
-    if (typeof window !== 'undefined') {
-      requestAnimationFrame(() => {
-        document
-          .getElementById('reveal-anchor')
-          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-    }
-  }, [caseMeta, studentNotes, confidence]);
+    setMode(hasRankableDdx ? 'ranking' : 'revealed');
+    scrollToAnchor();
+  }, [caseMeta, studentNotes, confidence, hasRankableDdx, scrollToAnchor]);
 
   // "Skip recall" — let the user view the case in browse mode (still
   // shows expert findings if available, but flips immediately).
+  // Bypasses the ranker entirely · users opting out of recall don't
+  // want a quiz either.
   const skipRecall = useCallback(() => {
     setMode('revealed');
   }, []);
+
+  // "Skip ranker" — from inside the ranking step, jump to compare.
+  // Reusable by both the explicit "Skip ranking" link and the post-
+  // submit "Continue to compare" button.
+  const skipRanker = useCallback(() => {
+    setMode('revealed');
+    scrollToAnchor();
+  }, [scrollToAnchor]);
+
+  // Persist the ranker outcome alongside notes/confidence. Don't
+  // overwrite existing notes/confidence/revealedAt — just merge in.
+  const onRankerSubmit = useCallback(
+    (result: { studentTop3: string[]; score: 0 | 1 | 2 | 3; rankedAt: string }) => {
+      if (!caseMeta) return;
+      const prior = readAttempts()[caseMeta.slug];
+      writeAttempt(caseMeta.slug, {
+        notes: prior?.notes ?? studentNotes,
+        confidence: prior?.confidence ?? confidence,
+        revealedAt: prior?.revealedAt ?? new Date().toISOString(),
+        lastEditedAt: prior?.lastEditedAt ?? new Date().toISOString(),
+        dxRanking: {
+          student: result.studentTop3,
+          score: result.score,
+          rankedAt: result.rankedAt,
+        },
+      });
+    },
+    [caseMeta, studentNotes, confidence],
+  );
 
   const breadcrumb = useMemo(() => {
     if (!caseMeta) return caseId;
@@ -326,10 +380,13 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
         )}
       </section>
 
-      {/* Recall / Revealed cards — smooth crossfade by always rendering
-          both and toggling visibility. Avoids layout shift and keeps the
-          textarea mounted (its content stays around to show as
-          "your notes" in revealed mode). */}
+      {/* Recall / Ranking / Revealed cards — smooth crossfade by always
+          rendering recall + revealed (textarea stays mounted so its
+          content shows as "your notes" in revealed mode). The Ranker
+          renders ONLY in `ranking` mode and unmounts after — it owns its
+          own internal post-submit "scored" UI state, but once the user
+          continues to compare we drop it so the parent state machine
+          stays simple. */}
       <div id="reveal-anchor" className="scroll-mt-4 relative">
         {/* RECALL card */}
         <div
@@ -348,6 +405,27 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
             onReveal={reveal}
           />
         </div>
+
+        {/* RANKING card — only rendered while in ranking mode. We mount
+            fresh each time so re-doing a case resets the slots; the
+            student's submitted ranking is still persisted to
+            localStorage for future analytics / SRS. */}
+        {mode === 'ranking' && caseMeta.recall && (
+          <DDxRankerCard
+            caseMeta={{
+              slug: caseMeta.slug,
+              species: caseMeta.species,
+              body_part: caseMeta.body_part,
+            }}
+            expertDdx={caseMeta.recall.ddx}
+            // Exclude the case's own final_diagnosis from the distractor pool
+            // so umbrella terms (e.g. "Cardiomegaly" on a cardiomegaly case)
+            // don't surface as wrong-choice distractors.
+            extraExcludes={caseMeta.recall.final_diagnosis ? [caseMeta.recall.final_diagnosis] : []}
+            onSubmit={onRankerSubmit}
+            onSkip={skipRanker}
+          />
+        )}
 
         {/* REVEALED card */}
         <div

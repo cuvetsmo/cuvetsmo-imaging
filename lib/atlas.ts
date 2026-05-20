@@ -96,6 +96,14 @@ export const BODY_PART_LABELS: Record<BodyPart, string> = {
 const POLLINATIONS_LICENSE = "cc-by-4.0";
 const POLLINATIONS_ATTR = "Generated via Pollinations.ai Flux model";
 
+// Phase 2 real-image swap — verbatim attribution strings derived from
+// the source `imageinfo.extmetadata.LicenseShortName` field on each
+// source page (Wikimedia Commons / Zenodo). Don't shorten these —
+// CC BY-SA 3.0/4.0 attribution requirement says give credit "in any
+// reasonable manner".
+const ATTR_VETXRAY =
+  "VetXRay — 9,882 manually annotated canine and feline thoracic radiographs · Zenodo · DOI:10.5281/zenodo.19051776 · CC BY 4.0";
+
 export const ATLAS_ENTRIES: AtlasEntry[] = [
   {
     id: "atlas-001",
@@ -114,9 +122,10 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
       "Vertebral column dorsally",
     ],
     image_path: "/atlas/canine-thorax-lat-001.jpg",
-    license: POLLINATIONS_LICENSE,
-    attribution: POLLINATIONS_ATTR,
-    credibility: "ai-generated",
+    license: "CC BY 4.0",
+    source_url: "https://zenodo.org/records/19051776",
+    attribution: ATTR_VETXRAY,
+    credibility: "peer-reviewed",
   },
   {
     id: "atlas-002",
@@ -135,9 +144,10 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
       "Mediastinum",
     ],
     image_path: "/atlas/canine-thorax-vd-001.jpg",
-    license: POLLINATIONS_LICENSE,
-    attribution: POLLINATIONS_ATTR,
-    credibility: "ai-generated",
+    license: "CC BY-SA 4.0",
+    source_url: "https://commons.wikimedia.org/wiki/File:Radiographie_thoracique_ventro-dorsale.jpg",
+    attribution: "Ophélie Tissier (2016). Radiographie thoracique grand chien, incidence ventro-dorsale. Wikimedia Commons. CC BY-SA 4.0.",
+    credibility: "community",
   },
   {
     id: "atlas-003",
@@ -178,9 +188,10 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
       "Iliac wings",
     ],
     image_path: "/atlas/canine-pelvis-vd-001.jpg",
-    license: POLLINATIONS_LICENSE,
-    attribution: POLLINATIONS_ATTR,
-    credibility: "ai-generated",
+    license: "CC BY-SA 3.0",
+    source_url: "https://commons.wikimedia.org/wiki/File:Normal_canine_hips.JPG",
+    attribution: "Joel Mills (2007). Normal canine hips. Wikimedia Commons. CC BY-SA 3.0.",
+    credibility: "community",
   },
   {
     id: "atlas-005",
@@ -220,9 +231,10 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
       "Caudal vena cava",
     ],
     image_path: "/atlas/feline-thorax-lat-001.jpg",
-    license: POLLINATIONS_LICENSE,
-    attribution: POLLINATIONS_ATTR,
-    credibility: "ai-generated",
+    license: "CC BY 4.0",
+    source_url: "https://zenodo.org/records/19051776",
+    attribution: ATTR_VETXRAY,
+    credibility: "peer-reviewed",
   },
   {
     id: "atlas-007",
@@ -242,9 +254,10 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
       "Urinary bladder",
     ],
     image_path: "/atlas/feline-abdomen-lat-001.jpg",
-    license: POLLINATIONS_LICENSE,
-    attribution: POLLINATIONS_ATTR,
-    credibility: "ai-generated",
+    license: "CC BY-SA 4.0",
+    source_url: "https://commons.wikimedia.org/wiki/File:Radio_abdominale_chat_-_LL_D_-_normale.jpg",
+    attribution: "Anja (2025). Radio abdominale, latéro-latérale droite, chat normal. Wikimedia Commons. CC BY-SA 4.0.",
+    credibility: "community",
   },
   {
     id: "atlas-008",

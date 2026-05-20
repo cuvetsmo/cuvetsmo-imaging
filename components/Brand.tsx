@@ -28,17 +28,24 @@ export function SiteHeader() {
             </div>
           </div>
         </Link>
-        <nav className="flex items-center gap-1 sm:gap-3 text-sm">
-          <Link href="/cases" className="px-2 py-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
+        {/* Nav: 5 items at 375px overflows the viewport when gap+padding
+            match the desktop layout, so we tighten both below sm. Each
+            link drops to px-1 + text-[13px] on phones and back to the
+            roomier desktop look at sm+. */}
+        <nav className="flex items-center gap-0.5 sm:gap-3 text-[13px] sm:text-sm">
+          <Link href="/cases" className="px-1 sm:px-2 py-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
             Cases
           </Link>
-          <Link href="/atlas" className="px-2 py-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
+          <Link href="/review" className="px-1 sm:px-2 py-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
+            Review
+          </Link>
+          <Link href="/atlas" className="px-1 sm:px-2 py-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
             Atlas
           </Link>
-          <Link href="/occlusion" className="px-2 py-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
+          <Link href="/occlusion" className="px-1 sm:px-2 py-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
             Occlusion
           </Link>
-          <Link href="/about" className="px-2 py-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
+          <Link href="/about" className="px-1 sm:px-2 py-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
             About
           </Link>
         </nav>

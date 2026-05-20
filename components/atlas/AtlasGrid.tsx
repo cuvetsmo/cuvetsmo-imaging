@@ -309,8 +309,10 @@ function FilterRow({
               onClick={() => onSelect(c.k)}
               disabled={isEmpty}
               aria-pressed={isActive}
+              aria-label={c.k === "all" ? c.label : `${c.label} (${count})`}
               className={[
-                "px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors",
+                // min-h ensures 44px tap target on mobile (per ux-audit checklist)
+                "inline-flex items-center gap-1.5 min-h-[36px] sm:min-h-[32px] px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors",
                 "border",
                 isActive
                   ? "bg-[var(--color-tool-cyan)] text-[#06070A] border-[var(--color-tool-cyan)]"
@@ -318,12 +320,16 @@ function FilterRow({
                 isEmpty ? "opacity-40 cursor-not-allowed" : "cursor-pointer",
               ].join(" ")}
             >
-              {c.label}
+              <span>{c.label}</span>
               {c.k !== "all" && (
                 <span
+                  aria-hidden
                   className={[
-                    "ml-1.5 text-[10px] font-mono",
-                    isActive ? "text-[#06070A]/70" : "text-[var(--color-text-faint)]",
+                    // tabular-nums + own pill so "DX 10" doesn't glue to "DX10"
+                    "tabular-nums text-[10px] font-mono px-1 py-0.5 rounded leading-none",
+                    isActive
+                      ? "bg-[#06070A]/15 text-[#06070A]/80"
+                      : "bg-[var(--color-bg)] text-[var(--color-text-faint)]",
                   ].join(" ")}
                 >
                   {count}
