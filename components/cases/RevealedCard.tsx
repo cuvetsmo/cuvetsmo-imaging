@@ -12,6 +12,12 @@ type Props = {
   confidence: Confidence;
   recall: Recall | undefined;
   currentSlug: string;
+  // ── Phase 3 lesion-spot CTA (added 2026-05-21) ──
+  // Optional · when both `canSpotLesion` is true AND `onTrySpotting` is
+  // provided, we render a "📍 Try spot-the-finding mode" button above
+  // the footer. Cases without lesion_regions skip the CTA entirely.
+  canSpotLesion?: boolean;
+  onTrySpotting?: () => void;
 };
 
 const PROB_LABEL: Record<NonNullable<Recall['ddx'][number]['probability']>, string> = {
@@ -29,7 +35,14 @@ const PROB_CHIP: Record<NonNullable<Recall['ddx'][number]['probability']>, strin
   low: 'border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text-muted)]',
 };
 
-export function RevealedCard({ studentNotes, confidence, recall, currentSlug }: Props) {
+export function RevealedCard({
+  studentNotes,
+  confidence,
+  recall,
+  currentSlug,
+  canSpotLesion,
+  onTrySpotting,
+}: Props) {
   // Heuristic "what you got right" highlighter. Splits the expert
   // findings into tokens, then for each finding bullet flags it if ANY
   // token (3+ chars) appears in the student's notes (case-insensitive).
@@ -201,6 +214,31 @@ export function RevealedCard({ studentNotes, confidence, recall, currentSlug }: 
         <p className="mb-4 text-[11px] font-mono text-[var(--color-text-faint)]">
           ref: {recall.citation}
         </p>
+      )}
+
+      {/* Lesion-spot CTA · only rendered when the case has expert lesion_regions
+          AND the parent wired the onTrySpotting callback. Cases without regions
+          (diffuse/pattern findings) skip this entire affordance. */}
+      {canSpotLesion && onTrySpotting && (
+        <div className="mb-4 rounded-md border border-[var(--color-tool-violet)]/30 bg-[rgba(167,139,250,0.06)] p-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[11px] font-mono uppercase tracking-wider text-[var(--color-tool-violet)] mb-1">
+              Try spot-the-finding
+            </div>
+            <p className="text-[13px] text-[var(--color-text-muted)] leading-relaxed">
+              วงสี่เหลี่ยมรอบบริเวณที่คิดว่ามี lesion แล้วเทียบกับ expert region.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onTrySpotting}
+            className="imaging-btn imaging-btn-violet shrink-0"
+          >
+            <span aria-hidden>📍</span>
+            Spot the finding
+            <span aria-hidden>→</span>
+          </button>
+        </div>
       )}
 
       {/* Footer · Next case (we don't know what next is without the full

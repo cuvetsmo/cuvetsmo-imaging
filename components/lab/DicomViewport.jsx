@@ -37,6 +37,12 @@ const PRESETS = [...WL_PRESETS, WL_PRESET_DICOM];
 // reliable than the DICOM-tag default (which is often the full bit
 // range = washed out). Sampled (~20 k) not full-image, so it's cheap
 // even on 4k DR images.
+//
+// NOTE: callers that want the cyan preset ring to stay active MUST
+// gate this call with `isApplyingPresetRef.current = true` and reset
+// the flag in a `queueMicrotask` — `viewport.setProperties` fires
+// `VOI_MODIFIED` synchronously within the same task, so a microtask
+// boundary is the tightest valid suppression window.
 function applySmartContrast(viewport) {
   try {
     const img = viewport?.csImage;
@@ -152,13 +158,21 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
         // Try smart auto-contrast as the default presentation. Falls
         // back silently to the DICOM-tag default if csImage isn't
         // ready yet (rare; happens with stack-loader race conditions).
+        // Gate the VOI_MODIFIED bounce — without the flag, the drift
+        // handler would null `activePreset` back to null in the same
+        // microtask we set it to 'auto'.
         requestAnimationFrame(() => {
           if (cancelled) return;
-          const ok = applySmartContrast(viewport);
-          // Mark Auto as the initial active preset only if it
-          // actually applied; on failure the DICOM-tag default
-          // wins and no preset is "active".
-          if (ok) setActivePreset('auto');
+          isApplyingPresetRef.current = true;
+          try {
+            const ok = applySmartContrast(viewport);
+            // Mark Auto as the initial active preset only if it
+            // actually applied; on failure the DICOM-tag default
+            // wins and no preset is "active".
+            if (ok) setActivePreset('auto');
+          } finally {
+            queueMicrotask(() => { isApplyingPresetRef.current = false; });
+          }
         });
 
         if (cancelled) return;
@@ -247,6 +261,15 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
   // `null` while smart-W/L initial compute is in flight or after the
   // user has manually adjusted W/L via the WindowLevelTool drag.
   const [activePreset, setActivePreset] = useState(null);
+  // Suppress the VOI_MODIFIED → setActivePreset(null) drift-clear for
+  // our OWN programmatic voiRange writes (preset apply · smart auto ·
+  // reset). Same shape as the camera-sync `isApplying` flag, but here
+  // it's a ref because the VOI event handler doesn't need to re-render
+  // when the flag flips — it just reads it. Set true BEFORE the write,
+  // reset in `queueMicrotask` so any synchronous VOI_MODIFIED bounce
+  // from `setProperties`/`resetProperties` is gated and any genuine
+  // user-drag VOI events arriving in later microtasks fall through.
+  const isApplyingPresetRef = useRef(false);
   // Ephemeral toast at bottom-center — fades after ~1.2 s. Cleared by
   // ID so rapid preset taps replace the previous toast instead of
   // queueing up.
@@ -272,27 +295,36 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
     if (!engine) return;
     const viewport = engine.getViewport(viewportIdRef.current);
     if (!viewport) return;
-    if (preset.isReset) {
-      viewport.resetProperties();
+    // Gate the VOI_MODIFIED bounce around every programmatic write so
+    // the drift-clear handler doesn't immediately null the ring we
+    // just set. Microtask-reset because setProperties fires the event
+    // synchronously inside the same task.
+    isApplyingPresetRef.current = true;
+    try {
+      if (preset.isReset) {
+        viewport.resetProperties();
+        viewport.render();
+        setActivePreset(preset.id);
+        showToast(formatPresetToast(preset));
+        return;
+      }
+      if (preset.isAuto) {
+        const ok = applySmartContrast(viewport);
+        if (ok) {
+          setActivePreset(preset.id);
+          showToast(formatPresetToast(preset));
+        }
+        return;
+      }
+      if (!preset.values) return;
+      const voi = wlToVoiRange(preset.values);
+      viewport.setProperties({ voiRange: voi });
       viewport.render();
       setActivePreset(preset.id);
       showToast(formatPresetToast(preset));
-      return;
+    } finally {
+      queueMicrotask(() => { isApplyingPresetRef.current = false; });
     }
-    if (preset.isAuto) {
-      const ok = applySmartContrast(viewport);
-      if (ok) {
-        setActivePreset(preset.id);
-        showToast(formatPresetToast(preset));
-      }
-      return;
-    }
-    if (!preset.values) return;
-    const voi = wlToVoiRange(preset.values);
-    viewport.setProperties({ voiRange: voi });
-    viewport.render();
-    setActivePreset(preset.id);
-    showToast(formatPresetToast(preset));
   }, [showToast]);
 
   // 10% zoom step per "+"/"-" press. Cornerstone3D exposes
@@ -320,11 +352,21 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
     if (!engine) return;
     const viewport = engine.getViewport(viewportIdRef.current);
     if (!viewport) return;
-    viewport.resetCamera();
-    viewport.resetProperties();
-    viewport.render();
-    setActivePreset(null);
-    showToast('Reset view');
+    // `resetProperties()` rewrites voiRange to the DICOM-tag default,
+    // which fires VOI_MODIFIED. We explicitly want the cyan ring to
+    // clear here anyway (no preset is "the active one" after a reset),
+    // but route through the flag so the drift handler doesn't double-
+    // null an already-null state on the same event.
+    isApplyingPresetRef.current = true;
+    try {
+      viewport.resetCamera();
+      viewport.resetProperties();
+      viewport.render();
+      setActivePreset(null);
+      showToast('Reset view');
+    } finally {
+      queueMicrotask(() => { isApplyingPresetRef.current = false; });
+    }
   }, [showToast]);
 
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -465,6 +507,44 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
       window.removeEventListener('vmx-lab-sync-camera', onRemoteCamera);
     };
   }, [syncEnabled, status]);
+
+  // W/L drift detection — when the user drags W/L via the
+  // WindowLevelTool after a preset is applied, the cyan ring should
+  // clear so it doesn't lie about what's active.
+  //
+  // Subscribe on the viewport element (the same surface Cornerstone
+  // dispatches CAMERA_MODIFIED on). `isApplyingPresetRef` gates our
+  // own programmatic writes (applyPreset · resetView · initial
+  // smart-contrast) — those set the flag true, do the write, and
+  // reset in a `queueMicrotask` so the synchronous VOI_MODIFIED
+  // bounce is suppressed but any user-drag event arriving on a later
+  // tick falls through and clears the ring.
+  //
+  // Strict-Mode safety: effect deps are [status, file], cleanup
+  // removes the listener via the SAME element ref captured at
+  // subscribe time. The unique `engineSeq` IDs Agent D established
+  // mean a Strict-Mode double-mount unmounts the first engine + tool
+  // group cleanly; this listener follows the same lifecycle.
+  useEffect(() => {
+    if (status !== 'ready') return;
+    const element = elRef.current;
+    if (!element) return;
+
+    const onVoiModified = () => {
+      // Our own programmatic write — bounce is expected, ignore.
+      if (isApplyingPresetRef.current) return;
+      // User drag (or any other source we didn't gate) — the visible
+      // ring is now wrong. Clear it. Silent UX: the cyan ring
+      // disappearing IS the signal — no toast needed (a toast on
+      // every drag-update would spam during a continuous drag).
+      setActivePreset((cur) => (cur === null ? cur : null));
+    };
+
+    element.addEventListener(Enums.Events.VOI_MODIFIED, onVoiModified);
+    return () => {
+      element.removeEventListener(Enums.Events.VOI_MODIFIED, onVoiModified);
+    };
+  }, [status, file]);
 
   // Keyboard shortcuts. Bound at the window level but skip when the
   // user is typing in a form input (so other views aren't hijacked

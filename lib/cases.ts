@@ -38,6 +38,44 @@ export type ImagingCase = {
     final_diagnosis: string;                                     // one-line dx
     teaching_points?: string[];                                  // optional pearls
     citation?: string;                                           // optional textbook / paper ref
+    // Optional expert ground truth for guided measurement scoring.
+    // Only set when the value is defensible from the source (peer-
+    // reviewed dataset label, published case, expert read). Cases
+    // without a single expected value (e.g. obscured cardiac border
+    // from effusion) deliberately leave this undefined — the overlay
+    // gracefully degrades to live measurement only.
+    ground_truth?: {
+      norberg?: {
+        /** Expected Norberg angle (degrees), left hip vertex. */
+        left: number;
+        /** Expected Norberg angle (degrees), right hip vertex. */
+        right: number;
+        /** Where the expected number came from — for the UI tooltip. */
+        source?: string;
+      };
+      vhs?: {
+        /** Expected VHS in vertebra units. */
+        value: number;
+        /** Provenance string shown next to the result. */
+        source?: string;
+      };
+    };
+    // ── Lesion-spot mode (added 2026-05-20, Phase 3) ──
+    // Optional · only seed for cases where the lesion has a defensible
+    // bounding region. Diffuse/pattern diseases (alveolar, interstitial,
+    // bronchial) are NOT spot-localizable and MUST stay unseeded so the
+    // student doesn't get scored against a fabricated guess.
+    // Coordinates are normalized [0, 1] in (x, y, w, h) relative to the
+    // rendered viewport (origin = top-left of the displayed image area).
+    // Cases without this field auto-skip the spotting mode in the UI.
+    lesion_regions?: {
+      /** Short noun phrase, e.g. "cardiac silhouette", "pleural fluid". */
+      label: string;
+      /** Normalized bounding box in [0, 1] coordinates. */
+      box: { x: number; y: number; w: number; h: number };
+      /** One-sentence anatomy/teaching note shown after submit. */
+      hint?: string;
+    }[];
   };
 };
 
@@ -195,6 +233,17 @@ export const CASES: ImagingCase[] = [
         "Cats have proportionally smaller cardiac silhouette vs dogs",
       ],
       citation: ATTR_VETXRAY,
+      // Defensible because the dataset label is `no_finding` (peer-
+      // reviewed VetXRay) and the published feline mean is 7.5 v
+      // (Litster & Buchanan 2000). Mid-range placement avoids
+      // implying false precision beyond the dataset's per-case
+      // resolution.
+      ground_truth: {
+        vhs: {
+          value: 7.5,
+          source: "Litster & Buchanan 2000 feline mean · dataset label = no_finding",
+        },
+      },
     },
   },
   {
@@ -235,6 +284,31 @@ export const CASES: ImagingCase[] = [
         '"Valentine heart" silhouette on DV/VD is the classic HCM marker',
       ],
       citation: ATTR_VETXRAY,
+      // Defensible because dataset label is `cardiomegaly` (peer-
+      // reviewed) — feline cardiomegaly literature places mild–
+      // moderate enlargement at ~8.7–9.0 v (Litster 2000 reports
+      // affected cats clustering ~1 v above the 8.1 upper limit).
+      ground_truth: {
+        vhs: {
+          value: 8.8,
+          source: "Litster 2000 cardiomegaly cluster · dataset label = cardiomegaly",
+        },
+      },
+      // Defensible because cardiomegaly = enlarged cardiac silhouette
+      // by definition. In a feline lateral, the heart sits roughly
+      // mid-thorax, slightly cranio-ventral, occupying ~2-3 intercostal
+      // spaces between sternum and the caudal vena cava (Schwarz &
+      // Johnson, BSAVA Manual of Canine and Feline Thoracic Imaging
+      // 2008, Ch. 4). The box is centered on the cardiac silhouette
+      // and slightly enlarged vs normal-cat anatomy to reflect the
+      // enlarged outline. ~30% width × 35% height of typical thorax.
+      lesion_regions: [
+        {
+          label: "enlarged cardiac silhouette",
+          box: { x: 0.32, y: 0.40, w: 0.32, h: 0.35 },
+          hint: 'Compare against the feline normal case — the enlarged heart fills more intercostal spaces and pushes the trachea dorsally. "Valentine heart" on DV is the HCM tell.',
+        },
+      ],
     },
   },
   {
@@ -425,6 +499,21 @@ export const CASES: ImagingCase[] = [
         "Always measure mass dimensions for staging and treatment follow-up",
       ],
       citation: ATTR_VETXRAY,
+      // Defensible because feline thoracic mass top DDx (mediastinal
+      // lymphoma + thymoma) localize to the CRANIAL mediastinum on a
+      // lateral view — anatomically the cranio-ventral region just
+      // dorsal to the sternum and ventral to the trachea, between the
+      // thoracic inlet and the heart. Cranial-end of image (left side
+      // in standard LL orientation) is x ≈ 0.10-0.45. A wider box
+      // covers the cardiothoracic region overall since the dataset
+      // label is generic "mass" and the exact lobe isn't published.
+      lesion_regions: [
+        {
+          label: "cranial mediastinal mass",
+          box: { x: 0.18, y: 0.32, w: 0.32, h: 0.28 },
+          hint: "Mediastinal masses in cats classically occupy the cranio-ventral mediastinum — thymoma (older cats) and lymphoma (young cats) are the top DDx.",
+        },
+      ],
     },
   },
   {
@@ -465,6 +554,20 @@ export const CASES: ImagingCase[] = [
         "Treat the patient, not the radiograph — clinical signs override imaging when patient is decompensating",
       ],
       citation: ATTR_VETXRAY,
+      // Defensible because pneumothorax on a lateral view shows as a
+      // radiolucent (very dark, air) crescent between the dorsal lung
+      // border and the thoracic spine — the heart is also classically
+      // "elevated" off the sternum on lateral. The dorsal-caudal lung
+      // edge separation is the textbook sign (Thrall, Veterinary
+      // Diagnostic Radiology 7e, Ch. 36). Box covers the dorsal
+      // hemithorax where the gas band appears.
+      lesion_regions: [
+        {
+          label: "dorsal pleural air gap",
+          box: { x: 0.25, y: 0.05, w: 0.55, h: 0.25 },
+          hint: "On a lateral, look for a radiolucent (black) band between the lung edge and the thoracic spine, and an elevated cardiac silhouette off the sternum.",
+        },
+      ],
     },
   },
 
@@ -504,6 +607,15 @@ export const CASES: ImagingCase[] = [
         "Breed conformation modifies the upper end — Labradors and barrel-chested breeds can run 10.5–11 while normal",
       ],
       citation: ATTR_VETXRAY,
+      // Defensible because dataset label is `no_finding` (peer-
+      // reviewed) and canine published mean is 9.7 v (Buchanan
+      // 1995). Anchored slightly below the mean to land mid-window.
+      ground_truth: {
+        vhs: {
+          value: 9.5,
+          source: "Buchanan & Bücheler 1995 canine mean · dataset label = no_finding",
+        },
+      },
     },
   },
   {
@@ -542,6 +654,31 @@ export const CASES: ImagingCase[] = [
         "DCM more common in large breeds (Doberman, Great Dane, Boxer)",
       ],
       citation: ATTR_VETXRAY,
+      // Defensible because dataset label is `cardiomegaly` and the
+      // common clinical literature (Buchanan; Lamb & Boswood) places
+      // moderate cardiomegaly at ~11.5 v in dogs — about 1 v above
+      // the 10.5 upper limit. Without the original case's reader
+      // value, mid-cardiomegaly is the most defensible anchor.
+      ground_truth: {
+        vhs: {
+          value: 11.5,
+          source: "Lamb & Boswood 2002 moderate cardiomegaly cluster · dataset label = cardiomegaly",
+        },
+      },
+      // Defensible because cardiomegaly = enlarged cardiac silhouette
+      // by definition. In a canine lateral the heart occupies roughly
+      // T4-T8 vertebral span (Buchanan 1995) — mid-thorax horizontally
+      // and centered vertically. An enlarged silhouette spreads both
+      // cranially (toward the trachea) and caudally (toward the
+      // diaphragm), so the box is slightly wider than the feline
+      // analog. ~35% width × 38% height.
+      lesion_regions: [
+        {
+          label: "enlarged cardiac silhouette",
+          box: { x: 0.30, y: 0.36, w: 0.36, h: 0.38 },
+          hint: "VHS workflow tells you HOW MUCH the heart is enlarged. Spot-the-finding tells you WHERE the cardiac silhouette is on the image. Use both.",
+        },
+      ],
     },
   },
   {
@@ -614,6 +751,22 @@ export const CASES: ImagingCase[] = [
         "Follow up with CT for staging — radiographs miss ~30% of metastatic nodules",
       ],
       citation: ATTR_VETXRAY,
+      // Defensible only as a WIDE "lung-field" search region: the
+      // VetXRay dataset label is generic "mass" with no published lobe
+      // location for this individual case, so we can't pinpoint a
+      // specific pulmonary nodule honestly. Instead we mark the
+      // caudo-dorsal lung field — the most common site for primary
+      // pulmonary neoplasia in dogs (per Thrall 7e Ch.32: caudal lobes
+      // are over-represented for primary lung tumors). Wider box +
+      // explicit hint = student learns to search the right anatomic
+      // zone, not to nail a fabricated coordinate.
+      lesion_regions: [
+        {
+          label: "caudo-dorsal lung field (search zone)",
+          box: { x: 0.50, y: 0.25, w: 0.40, h: 0.45 },
+          hint: "Without a lobe-specific label, the caudo-dorsal lung field is the canonical search region for canine primary pulmonary mass. Compare against the canine-normal lung pattern.",
+        },
+      ],
     },
   },
   {

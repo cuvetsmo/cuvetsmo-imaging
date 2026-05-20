@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useMediaQuery } from '../../lib/dicom/use-media-query.js';
+import { scoreAngle } from '../../lib/scoring/measurement';
+import { CASES } from '../../lib/cases';
 
 // Norberg angle workflow on a VD pelvis radiograph:
 //   1) center of the left femoral head
@@ -24,8 +26,19 @@ const STEPS = [
 const COLORS = ['#ff6b6b', '#6bb6ff', '#ffaa6b', '#6bffaa'];
 const LABELS = ['L♀', 'R♀', 'L⌃', 'R⌃'];
 
-export default function NorbergOverlay({ active, viewportRef, caseId = null }) {
+export default function NorbergOverlay({ active, viewportRef, caseId = null, groundTruth = null }) {
   const isMobile = useMediaQuery('(max-width: 600px)');
+  // If the parent didn't pass `groundTruth`, look up the case by id
+  // and read it from `recall.ground_truth.norberg`. This keeps the
+  // wiring inside this component so DicomViewport stays untouched —
+  // any case with a defensible Norberg ground truth in lib/cases.ts
+  // gets auto-graded.
+  const resolvedGT = useMemo(() => {
+    if (groundTruth) return groundTruth;
+    if (!caseId) return null;
+    const found = CASES.find((c) => c.id === caseId);
+    return found?.recall?.ground_truth?.norberg ?? null;
+  }, [groundTruth, caseId]);
   // On mobile the result card eats half the canvas; let user collapse
   // it to a thin header bar so they can still see the image. Restored
   // when they tap the header again.
@@ -242,6 +255,22 @@ export default function NorbergOverlay({ active, viewportRef, caseId = null }) {
     };
   }, [worldPoints]);
 
+  // Only score when expert ground truth exists for this case. Without
+  // GT we render exactly the legacy live-measurement card so the
+  // overlay stays useful for ad-hoc DICOM drops.
+  const grading = useMemo(() => {
+    if (!angles || !resolvedGT || typeof resolvedGT.left !== 'number' || typeof resolvedGT.right !== 'number') {
+      return null;
+    }
+    const left = scoreAngle(angles.left, resolvedGT.left);
+    const right = scoreAngle(angles.right, resolvedGT.right);
+    // Worst-side bucket drives the overall headline so the student
+    // doesn't get "Perfect" on one hip while the other is way off.
+    const order = { perfect: 0, good: 1, off: 2, review: 3 };
+    const worst = order[left.bucket] >= order[right.bucket] ? left : right;
+    return { left, right, worst };
+  }, [angles, resolvedGT]);
+
   if (!active) return null;
 
   const nextLabel = STEPS[worldPoints.length];
@@ -344,6 +373,45 @@ export default function NorbergOverlay({ active, viewportRef, caseId = null }) {
           <div style={{ color: '#9bccff' }}>
             Right: <strong>{angles.right.toFixed(1)}°</strong> — {classify(angles.right)}
           </div>
+          {grading && (
+            <div
+              aria-live="polite"
+              style={{
+                marginTop: 10,
+                padding: '8px 10px',
+                background: 'rgba(255,255,255,0.05)',
+                border: `1px solid ${grading.worst.tone}`,
+                borderRadius: 4,
+                fontSize: '0.78rem',
+              }}
+            >
+              <div style={{ fontWeight: 'bold', color: grading.worst.tone, marginBottom: 4 }}>
+                {grading.worst.glyph} {grading.worst.label}
+              </div>
+              <div style={{ color: '#ff9b9b' }}>
+                L: <strong>{angles.left.toFixed(1)}°</strong> vs expected{' '}
+                <strong>{resolvedGT.left.toFixed(1)}°</strong>{' '}
+                <span style={{ color: grading.left.tone }}>
+                  ({grading.left.delta >= 0 ? '+' : ''}{grading.left.delta.toFixed(1)}° {grading.left.glyph})
+                </span>
+              </div>
+              <div style={{ color: '#9bccff' }}>
+                R: <strong>{angles.right.toFixed(1)}°</strong> vs expected{' '}
+                <strong>{resolvedGT.right.toFixed(1)}°</strong>{' '}
+                <span style={{ color: grading.right.tone }}>
+                  ({grading.right.delta >= 0 ? '+' : ''}{grading.right.delta.toFixed(1)}° {grading.right.glyph})
+                </span>
+              </div>
+              <div style={{ marginTop: 4, color: '#ccc', fontSize: '0.7rem', lineHeight: 1.35 }}>
+                {grading.worst.description}
+              </div>
+              {resolvedGT.source && (
+                <div style={{ marginTop: 4, color: '#888', fontSize: '0.66rem' }}>
+                  ground truth: {resolvedGT.source}
+                </div>
+              )}
+            </div>
+          )}
           <div style={{ marginTop: 6, fontSize: '0.7rem', color: '#aaa' }}>
             เครื่องมือเพื่อการเรียนรู้ · ไม่ใช้แทนการ workup ผู้ป่วยจริง
           </div>

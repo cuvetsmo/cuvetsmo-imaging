@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useMediaQuery } from '../../lib/dicom/use-media-query.js';
+import { scoreVHS } from '../../lib/scoring/measurement';
+import { CASES } from '../../lib/cases';
 
 // Buchanan & Bücheler 1995 vertebral heart score on a right-lateral
 // thoracic radiograph. Six clicks define three measurements:
@@ -37,9 +39,22 @@ function refRangeForSpecies(species) {
   return null;
 }
 
-export default function VHSOverlay({ active, viewportRef, caseId = null, species = '' }) {
+export default function VHSOverlay({ active, viewportRef, caseId = null, species = '', groundTruth = null }) {
   const isMobile = useMediaQuery('(max-width: 600px)');
   const ref = refRangeForSpecies(species);
+  // Auto-look-up expert VHS from CASES by caseId when the parent
+  // didn't pass a `groundTruth` prop. Keeps DicomViewport untouched.
+  // Cases without a defensible ground truth (effusion, alveolar
+  // pattern, etc.) intentionally have no field — overlay graceful-
+  // degrades to live measurement.
+  const resolvedGT = useMemo(() => {
+    if (groundTruth && typeof groundTruth.vhs === 'number') return groundTruth;
+    if (!caseId) return null;
+    const found = CASES.find((c) => c.id === caseId);
+    const gt = found?.recall?.ground_truth?.vhs;
+    if (!gt) return null;
+    return { vhs: gt.value, source: gt.source };
+  }, [groundTruth, caseId]);
   const [cardCollapsed, setCardCollapsed] = useState(false);
   const [worldPoints, setWorldPoints] = useState([]);
   const [, setTick] = useState(0);
@@ -238,6 +253,15 @@ export default function VHSOverlay({ active, viewportRef, caseId = null, species
     return { Lv, Sv, vhs: Lv + Sv };
   }, [worldPoints]);
 
+  // Tolerance grade only renders when the case ships an expert value.
+  // Species is read from the DICOM tag (already on this component) so
+  // the scoring helper can return the correct reference range.
+  const grading = useMemo(() => {
+    if (!result || !resolvedGT || typeof resolvedGT.vhs !== 'number') return null;
+    const speciesKind = /feline|cat|felis/i.test(species) ? 'feline' : 'canine';
+    return scoreVHS(result.vhs, resolvedGT.vhs, speciesKind);
+  }, [result, resolvedGT, species]);
+
   if (!active) return null;
 
   const nextLabel = STEPS[worldPoints.length];
@@ -337,6 +361,43 @@ export default function VHSOverlay({ active, viewportRef, caseId = null, species
           <div style={{ marginTop: 6, fontSize: '1rem', color: '#ffd93d' }}>
             VHS = <strong>{result.vhs.toFixed(2)} v</strong>
           </div>
+          {grading && (
+            <div
+              aria-live="polite"
+              style={{
+                marginTop: 10,
+                padding: '8px 10px',
+                background: 'rgba(255,255,255,0.05)',
+                border: `1px solid ${grading.tone}`,
+                borderRadius: 4,
+                fontSize: '0.78rem',
+              }}
+            >
+              <div style={{ fontWeight: 'bold', color: grading.tone, marginBottom: 4 }}>
+                {grading.glyph} {grading.label}
+              </div>
+              <div>
+                Your VHS: <strong>{grading.vhs.toFixed(2)} v</strong> · Expected:{' '}
+                <strong>{grading.expected.toFixed(2)} v</strong> ·{' '}
+                <span style={{ color: grading.tone }}>
+                  Δ {grading.delta >= 0 ? '+' : ''}{grading.delta.toFixed(2)} v
+                </span>
+              </div>
+              {grading.normalRange && (
+                <div style={{ marginTop: 3, color: '#bbb', fontSize: '0.7rem' }}>
+                  {grading.normalRange.species} normal range {grading.normalRange.lo}–{grading.normalRange.hi} v
+                </div>
+              )}
+              <div style={{ marginTop: 4, color: '#ccc', fontSize: '0.7rem', lineHeight: 1.35 }}>
+                {grading.description}
+              </div>
+              {resolvedGT.source && (
+                <div style={{ marginTop: 4, color: '#888', fontSize: '0.66rem' }}>
+                  ground truth: {resolvedGT.source}
+                </div>
+              )}
+            </div>
+          )}
           <div style={{ marginTop: 6, fontSize: '0.72rem', color: '#aaa' }}>
             {ref ? (
               <>

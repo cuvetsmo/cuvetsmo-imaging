@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useDeferredValue, useRef, useId } from 'react';
 import Link from 'next/link';
 
 // CaseLibraryLocal — case-listing grid for the dark imaging.cuvetsmo.com theme.
@@ -8,11 +8,60 @@ import Link from 'next/link';
 // white-theme CaseLibrary. White card-backgrounds + #666 muted text against
 // the dark page made body text invisible (white-on-white). Palm flagged it
 // as "ตัวหนังสือมองไม่เห็น" — fixed by swapping every inline color to a
-// CSS custom property from `app/globals.css` (--color-surface-2, --color-
-// text-muted, --color-tool-cyan, etc.).
+// CSS custom property from `app/globals.css`.
+//
+// 2026-05-20 (Phase 3): added text search + difficulty filter + species
+// filter on top of the modality filter. All four facets AND-combined.
+// Per-chip counts compute against the OTHER three filters held constant
+// (so toggling one facet doesn't zero-out the others). Search uses a
+// pre-computed lowercase haystack per case + useDeferredValue to keep
+// typing snappy on slow devices. localStorage shape collapsed to one
+// JSON key `cuvi-cases-filters-v1` (legacy `cuvi-modality-filter` is
+// migrated on first read, then deleted).
 //
 // Reads from a static JSON case list at `/cases.json` (fetched at runtime
 // so cases can be added without a rebuild via the prebuild sync script).
+
+// ── Filter constants ──────────────────────────────────────────────────────
+
+const FILTERS_KEY = 'cuvi-cases-filters-v1';
+const LEGACY_MODALITY_KEY = 'cuvi-modality-filter';
+
+const EMPTY_FILTERS = Object.freeze({
+  search: '',
+  modality: 'all',
+  difficulty: 'all',
+  species: 'all',
+});
+
+function readPersistedFilters() {
+  if (typeof window === 'undefined') return { ...EMPTY_FILTERS };
+  try {
+    const raw = localStorage.getItem(FILTERS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        search: typeof parsed.search === 'string' ? parsed.search : '',
+        modality: typeof parsed.modality === 'string' ? parsed.modality : 'all',
+        difficulty: typeof parsed.difficulty === 'string' ? parsed.difficulty : 'all',
+        species: typeof parsed.species === 'string' ? parsed.species : 'all',
+      };
+    }
+    // Migrate legacy single-key shape
+    const legacy = localStorage.getItem(LEGACY_MODALITY_KEY);
+    if (legacy) {
+      const migrated = { ...EMPTY_FILTERS, modality: legacy };
+      try {
+        localStorage.setItem(FILTERS_KEY, JSON.stringify(migrated));
+        localStorage.removeItem(LEGACY_MODALITY_KEY);
+      } catch { /* noop */ }
+      return migrated;
+    }
+  } catch { /* noop */ }
+  return { ...EMPTY_FILTERS };
+}
+
+// ── Modality helpers ─────────────────────────────────────────────────────
 
 function modalityToKey(modality) {
   if (!modality) return 'other';
@@ -31,6 +80,13 @@ const MODALITY_TABS = [
   { k: 'mri',   label: 'MRI',         icon: '🧲' },
   { k: 'us',    label: 'Ultrasound',  icon: '🌊' },
   { k: 'other', label: 'Other',       icon: '❓' },
+];
+
+const DIFFICULTY_TABS = [
+  { k: 'all',          label: 'All',          icon: '📚' },
+  { k: 'intro',        label: 'intro',        icon: '🌱' },
+  { k: 'intermediate', label: 'intermediate', icon: '🌿' },
+  { k: 'advanced',     label: 'advanced',     icon: '🌳' },
 ];
 
 // Modality badge colors — kept semantically distinct but desaturated for
@@ -85,20 +141,66 @@ function modalityShortLabel(k) {
   return MODALITY_TABS.find((t) => t.k === k)?.label || 'other';
 }
 
+// ── Search index helpers ─────────────────────────────────────────────────
+
+// Pre-compute a lowercase haystack per case so filtering doesn't run
+// .toLowerCase() on every keystroke (see feedback_input-lag-perf-checklist).
+// Thai characters are not cased — toLowerCase() is a no-op for them but
+// lowercases any Latin chars in titles like "VHS" or "HCM".
+function buildSearchIndex(cases) {
+  return cases.map((c) => {
+    const parts = [
+      c.title,
+      c.species,
+      c.signalment,
+      c.body_part,
+      c.history,
+      c.modality,
+      c.difficulty,
+      Array.isArray(c.learning_objectives) ? c.learning_objectives.join(' ') : '',
+      c.recall?.final_diagnosis,
+    ];
+    const haystack = parts.filter(Boolean).join('  ').toLowerCase();
+    return { ...c, _haystack: haystack };
+  });
+}
+
+// Apply the four filters with optional skip — used for both the filtered
+// list and per-chip counts (where we hold the OTHER three filters constant).
+function applyFilters(indexed, filters, skip = {}) {
+  const q = skip.search ? '' : (filters.search || '').trim().toLowerCase();
+  return indexed.filter((c) => {
+    if (q && !c._haystack.includes(q)) return false;
+    if (!skip.modality && filters.modality !== 'all' && modalityToKey(c.modality) !== filters.modality) return false;
+    if (!skip.difficulty && filters.difficulty !== 'all' && (c.difficulty || 'unknown') !== filters.difficulty) return false;
+    if (!skip.species && filters.species !== 'all' && (c.species || 'unknown') !== filters.species) return false;
+    return true;
+  });
+}
+
+// ── Component ────────────────────────────────────────────────────────────
+
 export default function CaseLibraryLocal() {
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [modalityFilter, setModalityFilter] = useState(() => {
-    if (typeof window === 'undefined') return 'all';
-    try { return localStorage.getItem('cuvi-modality-filter') || 'all'; } catch { return 'all'; }
-  });
 
-  const onSetModalityFilter = useCallback((k) => {
-    setModalityFilter(k);
-    try { localStorage.setItem('cuvi-modality-filter', k); } catch { /* noop */ }
-  }, []);
+  // Filters
+  const [filters, setFilters] = useState(readPersistedFilters);
+  const deferredSearch = useDeferredValue(filters.search);
 
+  // Persist on change
+  useEffect(() => {
+    try { localStorage.setItem(FILTERS_KEY, JSON.stringify(filters)); } catch { /* noop */ }
+  }, [filters]);
+
+  const setSearch = useCallback((v) => setFilters((f) => ({ ...f, search: v })), []);
+  const setModality = useCallback((v) => setFilters((f) => ({ ...f, modality: v })), []);
+  const setDifficulty = useCallback((v) => setFilters((f) => ({ ...f, difficulty: v })), []);
+  const setSpecies = useCallback((v) => setFilters((f) => ({ ...f, species: v })), []);
+  const clearAll = useCallback(() => setFilters({ ...EMPTY_FILTERS }), []);
+
+  // Fetch cases
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -109,7 +211,6 @@ export default function CaseLibraryLocal() {
         if (!cancelled) setCases(Array.isArray(data) ? data : []);
       } catch (e) {
         if (!cancelled) {
-          // Missing /cases.json = empty library, not an error
           if (/HTTP 404/.test(e?.message || '')) setCases([]);
           else setError(e?.message || String(e));
         }
@@ -120,16 +221,72 @@ export default function CaseLibraryLocal() {
     return () => { cancelled = true; };
   }, []);
 
-  const filtered = useMemo(() => {
-    if (modalityFilter === 'all') return cases;
-    return cases.filter((c) => modalityToKey(c.modality) === modalityFilter);
-  }, [cases, modalityFilter]);
+  // Build the search index ONCE per cases load (not per keystroke).
+  const indexed = useMemo(() => buildSearchIndex(cases), [cases]);
 
-  const counts = useMemo(() => {
-    const c = { all: cases.length, xray: 0, ct: 0, mri: 0, us: 0, other: 0 };
-    for (const cs of cases) c[modalityToKey(cs.modality)]++;
-    return c;
+  // Derive available species options from data so "ostrich" appears
+  // automatically when a new case lands without a code change.
+  const speciesOptions = useMemo(() => {
+    const seen = new Map();
+    for (const c of cases) {
+      const s = c.species;
+      if (!s) continue;
+      if (!seen.has(s)) seen.set(s, true);
+    }
+    return [{ k: 'all', label: 'All', icon: '🐾' }, ...Array.from(seen.keys()).sort().map((s) => ({
+      k: s,
+      label: s,
+      icon: s === 'canine' ? '🐶' : s === 'feline' ? '🐱' : s === 'equine' ? '🐴' : s === 'bovine' ? '🐄' : '🐾',
+    }))];
   }, [cases]);
+
+  // Effective filter object — substitute the deferred search in for the
+  // live input so we filter against the deferred value, but the input
+  // displays the live value. Same trick framer-motion / react-spring use.
+  const effective = useMemo(() => ({
+    search: deferredSearch,
+    modality: filters.modality,
+    difficulty: filters.difficulty,
+    species: filters.species,
+  }), [deferredSearch, filters.modality, filters.difficulty, filters.species]);
+
+  const filtered = useMemo(() => applyFilters(indexed, effective), [indexed, effective]);
+
+  // Per-facet counts: each facet's chips count against the OTHER 3 filters
+  // held constant. Iron Rule 0: derive from actual filtered subset, never hardcode.
+  const modalityCounts = useMemo(() => {
+    const subset = applyFilters(indexed, effective, { modality: true });
+    const c = { all: subset.length, xray: 0, ct: 0, mri: 0, us: 0, other: 0 };
+    for (const cs of subset) c[modalityToKey(cs.modality)]++;
+    return c;
+  }, [indexed, effective]);
+
+  const difficultyCounts = useMemo(() => {
+    const subset = applyFilters(indexed, effective, { difficulty: true });
+    const c = { all: subset.length, intro: 0, intermediate: 0, advanced: 0 };
+    for (const cs of subset) {
+      const d = cs.difficulty || 'unknown';
+      if (c[d] !== undefined) c[d]++;
+    }
+    return c;
+  }, [indexed, effective]);
+
+  const speciesCounts = useMemo(() => {
+    const subset = applyFilters(indexed, effective, { species: true });
+    const c = { all: subset.length };
+    for (const cs of subset) {
+      const s = cs.species || 'unknown';
+      c[s] = (c[s] || 0) + 1;
+    }
+    return c;
+  }, [indexed, effective]);
+
+  const hasAnyActive = filters.search.trim() !== '' || filters.modality !== 'all' || filters.difficulty !== 'all' || filters.species !== 'all';
+
+  // Search field — uncontrolled-ish: live input value drives `filters.search`
+  // each keystroke, but the actual filter pass runs against `deferredSearch`.
+  const searchInputRef = useRef(null);
+  const searchInputId = useId();
 
   return (
     <div>
@@ -164,29 +321,76 @@ export default function CaseLibraryLocal() {
       {error && <div style={errorStyle}>โหลดไม่สำเร็จ — {error}</div>}
 
       {!loading && !error && cases.length > 0 && (
-        <div style={tabRowStyle}>
-          {MODALITY_TABS.map((t) => {
-            const count = counts[t.k] || 0;
-            const isActive = modalityFilter === t.k;
-            const isEmpty = count === 0 && t.k !== 'all';
-            return (
+        <div style={filterBlockStyle}>
+          {/* Search input row */}
+          <div style={searchRowStyle}>
+            <label htmlFor={searchInputId} style={srOnlyStyle}>ค้นหา case</label>
+            <div style={searchWrapStyle}>
+              <span aria-hidden style={searchIconStyle}>🔍</span>
+              <input
+                id={searchInputId}
+                ref={searchInputRef}
+                type="search"
+                value={filters.search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="ค้นหา case, species, diagnosis"
+                style={searchInputStyle}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              {filters.search && (
+                <button
+                  type="button"
+                  onClick={() => { setSearch(''); searchInputRef.current?.focus(); }}
+                  style={searchClearBtnStyle}
+                  aria-label="ล้างคำค้น"
+                  title="ล้างคำค้น"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            {hasAnyActive && (
               <button
-                key={t.k}
-                onClick={() => onSetModalityFilter(t.k)}
-                disabled={isEmpty}
-                style={{
-                  ...tabBtnStyle,
-                  ...(isActive ? tabBtnActiveStyle : {}),
-                  ...(isEmpty ? tabBtnEmptyStyle : {}),
-                }}
-                title={isEmpty ? `ยังไม่มี ${t.label} case` : `${t.label} (${count} case)`}
+                type="button"
+                onClick={clearAll}
+                style={clearAllBtnStyle}
+                title="ล้างตัวกรองทั้งหมด"
               >
-                <span aria-hidden style={{ marginRight: 4 }}>{t.icon}</span>
-                {t.label}
-                <span style={{ opacity: 0.65, fontSize: '0.85em', marginLeft: 5 }}>({count})</span>
+                ล้างตัวกรอง
               </button>
-            );
-          })}
+            )}
+          </div>
+
+          {/* Modality chips */}
+          <ChipRow
+            label="Modality"
+            options={MODALITY_TABS}
+            value={filters.modality}
+            counts={modalityCounts}
+            onChange={setModality}
+          />
+
+          {/* Difficulty chips */}
+          <ChipRow
+            label="Difficulty"
+            options={DIFFICULTY_TABS}
+            value={filters.difficulty}
+            counts={difficultyCounts}
+            onChange={setDifficulty}
+          />
+
+          {/* Species chips — derived from data */}
+          {speciesOptions.length > 1 && (
+            <ChipRow
+              label="Species"
+              options={speciesOptions}
+              value={filters.species}
+              counts={speciesCounts}
+              onChange={setSpecies}
+              isLast
+            />
+          )}
         </div>
       )}
 
@@ -213,14 +417,62 @@ export default function CaseLibraryLocal() {
       {!loading && !error && cases.length > 0 && filtered.length === 0 && (
         <div style={emptyStyle}>
           <div style={{ fontSize: '2rem', marginBottom: 6 }}>📭</div>
-          <div style={{ color: 'var(--color-text)' }}>
-            ยังไม่มี <strong>{modalityShortLabel(modalityFilter)}</strong> case ใน library
+          <div style={{ color: 'var(--color-text)', fontWeight: 600 }}>
+            ไม่พบ case ที่ตรงกับเงื่อนไข
           </div>
+          <div style={{ fontSize: '0.82rem', marginTop: 8, color: 'var(--color-text-muted)' }}>
+            ล้างตัวกรองเพื่อดูทั้งหมด
+          </div>
+          <button
+            type="button"
+            onClick={clearAll}
+            style={{ ...clearAllBtnStyle, marginTop: 14 }}
+          >
+            ล้างตัวกรองทั้งหมด
+          </button>
         </div>
       )}
     </div>
   );
 }
+
+// ── ChipRow ──────────────────────────────────────────────────────────────
+
+function ChipRow({ label, options, value, counts, onChange, isLast = false }) {
+  return (
+    <div style={{ ...chipRowWrapStyle, ...(isLast ? { marginBottom: 0, paddingBottom: 0, borderBottom: 'none' } : {}) }}>
+      <div style={chipRowLabelStyle}>{label}</div>
+      <div style={chipRowStyle}>
+        {options.map((t) => {
+          const count = counts[t.k] || 0;
+          const isActive = value === t.k;
+          const isEmpty = count === 0 && t.k !== 'all';
+          return (
+            <button
+              key={t.k}
+              type="button"
+              onClick={() => onChange(t.k)}
+              disabled={isEmpty}
+              aria-pressed={isActive}
+              style={{
+                ...chipBtnStyle,
+                ...(isActive ? chipBtnActiveStyle : {}),
+                ...(isEmpty ? chipBtnEmptyStyle : {}),
+              }}
+              title={isEmpty ? `ยังไม่มี ${t.label} case ในชุดที่กรอง` : `${t.label} (${count} case)`}
+            >
+              {t.icon && <span aria-hidden style={{ marginRight: 4 }}>{t.icon}</span>}
+              {t.label}
+              <span style={{ opacity: 0.65, fontSize: '0.85em', marginLeft: 5 }}>({count})</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── CaseCard ─────────────────────────────────────────────────────────────
 
 function CaseCard({ caseData }) {
   return (
@@ -326,16 +578,112 @@ const cardStyle = {
   flexDirection: 'column',
 };
 
-const tabRowStyle = {
-  display: 'flex',
-  gap: 6,
-  flexWrap: 'wrap',
+// Filter block wraps search + 3 chip rows in one card
+const filterBlockStyle = {
   marginBottom: 14,
   paddingBottom: 10,
   borderBottom: '1px solid var(--color-border)',
 };
 
-const tabBtnStyle = {
+const searchRowStyle = {
+  display: 'flex',
+  gap: 8,
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  marginBottom: 12,
+};
+
+const searchWrapStyle = {
+  position: 'relative',
+  flex: '1 1 240px',
+  minWidth: 200,
+  display: 'flex',
+  alignItems: 'center',
+};
+
+const searchIconStyle = {
+  position: 'absolute',
+  left: 10,
+  pointerEvents: 'none',
+  fontSize: '0.95rem',
+  opacity: 0.7,
+  lineHeight: 1,
+};
+
+const searchInputStyle = {
+  width: '100%',
+  minHeight: 36,
+  padding: '6px 32px 6px 32px',
+  background: 'var(--color-surface-2)',
+  color: 'var(--color-text)',
+  border: '1px solid var(--color-border-bright)',
+  borderRadius: 8,
+  fontSize: '0.88rem',
+  outline: 'none',
+  // focus ring done via :focus-within if needed — here just a subtle border swap
+  // via :focus inline workaround skipped; CSS variable focus styles in globals.css if added later
+};
+
+const searchClearBtnStyle = {
+  position: 'absolute',
+  right: 6,
+  width: 24,
+  height: 24,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'transparent',
+  border: 'none',
+  color: 'var(--color-text-muted)',
+  cursor: 'pointer',
+  fontSize: '0.9rem',
+  borderRadius: 4,
+  padding: 0,
+};
+
+const clearAllBtnStyle = {
+  padding: '7px 12px',
+  background: 'transparent',
+  color: 'var(--color-tool-cyan)',
+  border: '1px solid var(--color-border-tool)',
+  borderRadius: 8,
+  fontSize: '0.78rem',
+  fontWeight: 500,
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+  minHeight: 32,
+};
+
+const chipRowWrapStyle = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: 8,
+  flexWrap: 'wrap',
+  marginBottom: 8,
+  paddingBottom: 8,
+  borderBottom: '1px dashed var(--color-border)',
+};
+
+const chipRowLabelStyle = {
+  fontSize: '0.7rem',
+  textTransform: 'uppercase',
+  letterSpacing: 0.6,
+  color: 'var(--color-text-faint, var(--color-text-muted))',
+  fontWeight: 600,
+  flex: '0 0 76px',
+  paddingTop: 8,
+  minWidth: 76,
+};
+
+const chipRowStyle = {
+  display: 'flex',
+  gap: 6,
+  flexWrap: 'wrap',
+  flex: '1 1 0',
+  minWidth: 0,
+};
+
+const chipBtnStyle = {
   padding: '6px 12px',
   background: 'var(--color-surface-2)',
   color: 'var(--color-text-muted)',
@@ -351,21 +699,31 @@ const tabBtnStyle = {
   transition: 'border-color 140ms, color 140ms, background-color 140ms',
 };
 
-const tabBtnActiveStyle = {
+const chipBtnActiveStyle = {
   background: 'var(--color-tool-cyan)',
   color: '#06070A',
   borderColor: 'var(--color-tool-cyan)',
   fontWeight: 600,
 };
 
-// Disabled tabs: keep readable (0.7 not 0.45) — Palm flagged old 0.45 made
-// them effectively invisible against the dark page bg.
-const tabBtnEmptyStyle = {
+const chipBtnEmptyStyle = {
   opacity: 0.7,
   cursor: 'not-allowed',
   color: 'var(--color-text-muted)',
   background: 'transparent',
   borderStyle: 'dashed',
+};
+
+const srOnlyStyle = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: 'hidden',
+  clip: 'rect(0,0,0,0)',
+  whiteSpace: 'nowrap',
+  border: 0,
 };
 
 const metaLineStyle = {

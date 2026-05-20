@@ -150,7 +150,13 @@
         "Feline VHS reference 6.7–8.1 (Litster & Buchanan 2000)",
         "Cats have proportionally smaller cardiac silhouette vs dogs"
       ],
-      "citation": "VetXRay — 9,882 manually annotated canine and feline thoracic radiographs · Zenodo · DOI:10.5281/zenodo.19051776 · CC BY 4.0"
+      "citation": "VetXRay — 9,882 manually annotated canine and feline thoracic radiographs · Zenodo · DOI:10.5281/zenodo.19051776 · CC BY 4.0",
+      "ground_truth": {
+        "vhs": {
+          "value": 7.5,
+          "source": "Litster & Buchanan 2000 feline mean · dataset label = no_finding"
+        }
+      }
     }
   },
   {
@@ -203,7 +209,25 @@
         "HCM is the most common cardiomyopathy in cats",
         "\"Valentine heart\" silhouette on DV/VD is the classic HCM marker"
       ],
-      "citation": "VetXRay — 9,882 manually annotated canine and feline thoracic radiographs · Zenodo · DOI:10.5281/zenodo.19051776 · CC BY 4.0"
+      "citation": "VetXRay — 9,882 manually annotated canine and feline thoracic radiographs · Zenodo · DOI:10.5281/zenodo.19051776 · CC BY 4.0",
+      "ground_truth": {
+        "vhs": {
+          "value": 8.8,
+          "source": "Litster 2000 cardiomegaly cluster · dataset label = cardiomegaly"
+        }
+      },
+      "lesion_regions": [
+        {
+          "label": "enlarged cardiac silhouette",
+          "box": {
+            "x": 0.32,
+            "y": 0.4,
+            "w": 0.32,
+            "h": 0.35
+          },
+          "hint": "Compare against the feline normal case — the enlarged heart fills more intercostal spaces and pushes the trachea dorsally. \"Valentine heart\" on DV is the HCM tell."
+        }
+      ]
     }
   },
   {
@@ -450,7 +474,19 @@
         "Mediastinal lymphoma is the most common cranial mediastinal mass in young cats",
         "Always measure mass dimensions for staging and treatment follow-up"
       ],
-      "citation": "VetXRay — 9,882 manually annotated canine and feline thoracic radiographs · Zenodo · DOI:10.5281/zenodo.19051776 · CC BY 4.0"
+      "citation": "VetXRay — 9,882 manually annotated canine and feline thoracic radiographs · Zenodo · DOI:10.5281/zenodo.19051776 · CC BY 4.0",
+      "lesion_regions": [
+        {
+          "label": "cranial mediastinal mass",
+          "box": {
+            "x": 0.18,
+            "y": 0.32,
+            "w": 0.32,
+            "h": 0.28
+          },
+          "hint": "Mediastinal masses in cats classically occupy the cranio-ventral mediastinum — thymoma (older cats) and lymphoma (young cats) are the top DDx."
+        }
+      ]
     }
   },
   {
@@ -502,7 +538,19 @@
         "Tension pneumothorax = mediastinal shift away from affected side — surgical emergency",
         "Treat the patient, not the radiograph — clinical signs override imaging when patient is decompensating"
       ],
-      "citation": "VetXRay — 9,882 manually annotated canine and feline thoracic radiographs · Zenodo · DOI:10.5281/zenodo.19051776 · CC BY 4.0"
+      "citation": "VetXRay — 9,882 manually annotated canine and feline thoracic radiographs · Zenodo · DOI:10.5281/zenodo.19051776 · CC BY 4.0",
+      "lesion_regions": [
+        {
+          "label": "dorsal pleural air gap",
+          "box": {
+            "x": 0.25,
+            "y": 0.05,
+            "w": 0.55,
+            "h": 0.25
+          },
+          "hint": "On a lateral, look for a radiolucent (black) band between the lung edge and the thoracic spine, and an elevated cardiac silhouette off the sternum."
+        }
+      ]
     }
   },
   {
@@ -541,7 +589,13 @@
         "Canine VHS reference 8.5–10.5 (Buchanan & Bucheler 1995)",
         "Breed conformation modifies the upper end — Labradors and barrel-chested breeds can run 10.5–11 while normal"
       ],
-      "citation": "VetXRay — 9,882 manually annotated canine and feline thoracic radiographs · Zenodo · DOI:10.5281/zenodo.19051776 · CC BY 4.0"
+      "citation": "VetXRay — 9,882 manually annotated canine and feline thoracic radiographs · Zenodo · DOI:10.5281/zenodo.19051776 · CC BY 4.0",
+      "ground_truth": {
+        "vhs": {
+          "value": 9.5,
+          "source": "Buchanan & Bücheler 1995 canine mean · dataset label = no_finding"
+        }
+      }
     }
   },
   {
@@ -593,7 +647,25 @@
         "MMVD is the #1 acquired cardiac disease in dogs, especially small breeds",
         "DCM more common in large breeds (Doberman, Great Dane, Boxer)"
       ],
-      "citation": "VetXRay — 9,882 manually annotated canine and feline thoracic radiographs · Zenodo · DOI:10.5281/zenodo.19051776 · CC BY 4.0"
+      "citation": "VetXRay — 9,882 manually annotated canine and feline thoracic radiographs · Zenodo · DOI:10.5281/zenodo.19051776 · CC BY 4.0",
+      "ground_truth": {
+        "vhs": {
+          "value": 11.5,
+          "source": "Lamb & Boswood 2002 moderate cardiomegaly cluster · dataset label = cardiomegaly"
+        }
+      },
+      "lesion_regions": [
+        {
+          "label": "enlarged cardiac silhouette",
+          "box": {
+            "x": 0.3,
+            "y": 0.36,
+            "w": 0.36,
+            "h": 0.38
+          },
+          "hint": "VHS workflow tells you HOW MUCH the heart is enlarged. Spot-the-finding tells you WHERE the cardiac silhouette is on the image. Use both."
+        }
+      ]
     }
   },
   {
@@ -684,7 +756,19 @@
         "Solitary well-defined mass favors primary tumor; multiple small nodules favor metastatic",
         "Follow up with CT for staging — radiographs miss ~30% of metastatic nodules"
       ],
-      "citation": "VetXRay — 9,882 manually annotated canine and feline thoracic radiographs · Zenodo · DOI:10.5281/zenodo.19051776 · CC BY 4.0"
+      "citation": "VetXRay — 9,882 manually annotated canine and feline thoracic radiographs · Zenodo · DOI:10.5281/zenodo.19051776 · CC BY 4.0",
+      "lesion_regions": [
+        {
+          "label": "caudo-dorsal lung field (search zone)",
+          "box": {
+            "x": 0.5,
+            "y": 0.25,
+            "w": 0.4,
+            "h": 0.45
+          },
+          "hint": "Without a lobe-specific label, the caudo-dorsal lung field is the canonical search region for canine primary pulmonary mass. Compare against the canine-normal lung pattern."
+        }
+      ]
     }
   },
   {

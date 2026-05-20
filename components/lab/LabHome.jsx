@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useMediaQuery } from '../../lib/dicom/use-media-query.js';
 import { CrosshairPattern } from '../CrosshairPattern';
+import OnboardingTour, { HelpButton, useOnboardingTour } from './OnboardingTour.jsx';
 
 const DicomViewport = lazy(() => import('./DicomViewport.jsx'));
 const TagInspector = lazy(() => import('./TagInspector.jsx'));
@@ -36,22 +37,17 @@ export default function LabHome() {
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState(null);
   const [recent, setRecent] = useState([]);
-  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  // 3-step onboarding tour (replaces the old "ยินดีต้อนรับ" welcome card).
+  // Auto-launches on first visit (key `cuvi-tour-completed-v1`), manually
+  // re-triggerable via the HelpButton in the bottom-right.
+  const { open: tourOpen, openTour, closeTour } = useOnboardingTour();
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(RECENT_KEY);
       if (raw) setRecent(JSON.parse(raw));
     } catch { /* corrupt JSON; ignore */ }
-    try {
-      const seen = localStorage.getItem('cuvi-onboarded');
-      if (!seen) setShowOnboarding(true);
-    } catch { /* ignore */ }
-  }, []);
-
-  const dismissOnboarding = useCallback(() => {
-    setShowOnboarding(false);
-    try { localStorage.setItem('cuvi-onboarded', '1'); } catch { /* noop */ }
   }, []);
 
   const addToRecent = useCallback((f) => {
@@ -173,6 +169,7 @@ export default function LabHome() {
   // moves below the hero where it makes sense as a follow-up action
   // rather than the headline.
   return (
+    <>
     <div className="relative imaging-hero-bg">
       {/* Faint DICOM crosshair grid wash behind everything — kept as clinical signature on top of the new mesh gradient */}
       <CrosshairPattern className="z-0" opacity={0.028} />
@@ -203,7 +200,7 @@ export default function LabHome() {
             </p>
 
             <div className="flex flex-wrap gap-3">
-              <Link href="/cases" className="imaging-btn imaging-btn-primary">
+              <Link href="/cases" data-tour="sample-case-cta" className="imaging-btn imaging-btn-primary">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <polygon points="5 3 19 12 5 21 5 3" />
                 </svg>
@@ -255,6 +252,7 @@ export default function LabHome() {
             onDragOver={onDragOver}
             onDragLeave={onDragLeave}
             data-dragging={dragging ? 'true' : 'false'}
+            data-tour="dropzone"
             className="imaging-dropzone"
           >
             <div className="px-6 py-12 sm:py-14 text-center relative z-10">
@@ -295,7 +293,7 @@ export default function LabHome() {
           <h2 className="text-[13px] font-mono uppercase tracking-[0.18em] text-[var(--color-text)] mb-4 flex items-center gap-2">
             <span className="text-[var(--color-tool-violet)]">03 /</span> Other modes
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div data-tour="tool-tiles" className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <ToolTile
               href="/cases"
               title="Case Library"
@@ -346,21 +344,6 @@ export default function LabHome() {
           </div>
         </section>
 
-        {showOnboarding && (
-          <div className="rounded-md border border-[var(--color-tool-cyan)]/30 bg-[rgba(90,204,230,0.06)] p-4 mb-6 flex items-start justify-between gap-3">
-            <div className="text-sm text-[var(--color-text)] leading-relaxed">
-              <strong className="text-[var(--color-text)]">ยินดีต้อนรับ Imaging Lab</strong>
-              <ul className="mt-2 pl-5 list-disc space-y-1 text-[var(--color-text-muted)]">
-                <li>ลาก DICOM (<code className="text-[var(--color-tool-cyan)]">.dcm</code>) ลงในกล่อง Free Mode — ครั้งละ 2 ไฟล์ได้ (side-by-side)</li>
-                <li>เปิด viewer แล้วกด <kbd className="px-1.5 py-0.5 border border-[var(--color-border)] rounded text-xs bg-[var(--color-bg)]">?</kbd> ดู 16 keyboard shortcuts</li>
-                <li>Norberg + VHS + Length/Angle ครบ, Anonymize ก่อน share ภาพออก</li>
-                <li>ไฟล์ render ใน browser ล้วน — ไม่ขึ้น server</li>
-              </ul>
-            </div>
-            <button onClick={dismissOnboarding} className="vmx-btn vmx-btn-ghost vmx-btn-sm shrink-0" aria-label="ปิด">✕</button>
-          </div>
-        )}
-
         {recent.length > 0 && (
           <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-4 text-sm">
             <div className="flex items-center justify-between mb-2">
@@ -396,10 +379,25 @@ export default function LabHome() {
 
         {/* Quiet footnote, replaces the old centered hero subhead */}
         <p className="mt-8 text-[11px] text-[var(--color-text-muted)] text-center">
-          New here? <Link href="/about" className="text-[var(--color-tool-cyan)] hover:underline">Read what this lab does ↗</Link>
+          New here?{' '}
+          <button
+            type="button"
+            onClick={openTour}
+            className="text-[var(--color-tool-cyan)] hover:underline"
+          >
+            ทบทวน tour ↻
+          </button>
+          {' · '}
+          <Link href="/about" className="text-[var(--color-tool-cyan)] hover:underline">Read what this lab does ↗</Link>
         </p>
       </div>
     </div>
+
+    {/* 3-step onboarding tour — auto-launches on first visit, manually
+        re-triggerable via the help button or the "ทบทวน tour" footer link. */}
+    <OnboardingTour open={tourOpen} onClose={closeTour} />
+    <HelpButton onOpen={openTour} hidden={tourOpen} />
+    </>
   );
 }
 

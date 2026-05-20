@@ -14,6 +14,8 @@ import type { ImagingCase } from '@/lib/cases';
 import { RecallInputCard } from './RecallInputCard';
 import { RevealedCard } from './RevealedCard';
 import { DDxRankerCard } from './DDxRankerCard';
+import { LesionSpotCard } from './LesionSpotCard';
+import type { Box } from '@/lib/scoring/iou';
 
 const DicomViewport = lazy(() => import('@/components/lab/DicomViewport.jsx'));
 
@@ -37,6 +39,17 @@ type AttemptRecord = {
     student: string[];      // student's top-3 names, in their ranked order
     score: 0 | 1 | 2 | 3;   // bucketed score for headline display
     rankedAt: string;       // ISO submission timestamp
+  };
+  // ── Lesion-spot outcome (added 2026-05-21, Phase 3) ──
+  // Optional · only present after the student submits a box in the
+  // spotting mode. Schema is forward-compatible: missing field means
+  // "spotting not attempted" or pre-Phase-3 attempt. Additive — old
+  // attempts continue to read correctly thanks to the defensive
+  // try/catch in readAttempts().
+  lesionSpot?: {
+    studentBox: Box;        // normalized [0, 1] coords of submitted box
+    iou: number;            // 0.0–1.0 best-match score across regions
+    submittedAt: string;    // ISO timestamp
   };
 };
 
@@ -70,7 +83,14 @@ type Status = 'loading' | 'ready' | 'not-found' | 'error';
 // `ranking` is the new intermediate step between recall + revealed. It's
 // only entered when the case has a non-empty `recall.ddx` array AND the
 // student went through the recall reveal flow (not skip-recall).
-type Mode = 'recall' | 'ranking' | 'revealed';
+//
+// `spotting` (added Phase 3, 2026-05-21) is an OPTIONAL post-reveal step
+// entered from the RevealedCard CTA. Available only when the case has
+// `recall.lesion_regions` populated · graceful-degrades by hiding the
+// CTA when regions are missing. Returning from spotting goes back to
+// `revealed`, not forward — the student can re-try the spotting from
+// the same compare view.
+type Mode = 'recall' | 'ranking' | 'revealed' | 'spotting';
 
 export function CaseDetailView({ caseId }: { caseId: string }) {
   // ── case loading ──
@@ -224,6 +244,48 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
           student: result.studentTop3,
           score: result.score,
           rankedAt: result.rankedAt,
+        },
+      });
+    },
+    [caseMeta, studentNotes, confidence],
+  );
+
+  // ── Lesion-spot wiring (Phase 3) ──
+  // Whether this case has expert lesion regions to score against. Drives
+  // the "try spot-the-finding" CTA on the RevealedCard. Cases without
+  // regions hide the CTA entirely.
+  const hasLesionRegions = !!(
+    caseMeta?.recall?.lesion_regions && caseMeta.recall.lesion_regions.length > 0
+  );
+
+  const enterSpotting = useCallback(() => {
+    if (!hasLesionRegions) return;
+    setMode('spotting');
+    scrollToAnchor();
+  }, [hasLesionRegions, scrollToAnchor]);
+
+  const exitSpotting = useCallback(() => {
+    setMode('revealed');
+    scrollToAnchor();
+  }, [scrollToAnchor]);
+
+  // Persist the lesion-spot outcome alongside other fields. Same merge
+  // pattern as the ranker callback — preserve prior data, never lose
+  // notes/confidence/ranking when only spotting was attempted.
+  const onLesionSpotSubmit = useCallback(
+    (result: { studentBox: Box; iou: number; submittedAt: string }) => {
+      if (!caseMeta) return;
+      const prior = readAttempts()[caseMeta.slug];
+      writeAttempt(caseMeta.slug, {
+        notes: prior?.notes ?? studentNotes,
+        confidence: prior?.confidence ?? confidence,
+        revealedAt: prior?.revealedAt ?? new Date().toISOString(),
+        lastEditedAt: prior?.lastEditedAt ?? new Date().toISOString(),
+        dxRanking: prior?.dxRanking,
+        lesionSpot: {
+          studentBox: result.studentBox,
+          iou: result.iou,
+          submittedAt: result.submittedAt,
         },
       });
     },
@@ -439,8 +501,27 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
             confidence={confidence}
             recall={caseMeta.recall}
             currentSlug={caseMeta.slug}
+            canSpotLesion={hasLesionRegions}
+            onTrySpotting={enterSpotting}
           />
         </div>
+
+        {/* SPOTTING card — only rendered while in spotting mode. Mounts
+            its own copy of DicomViewport so the box-coords map cleanly to
+            a fit-to-container layout. Unmounts on exit so re-entering
+            starts the student with a fresh box. Only available when the
+            case has expert lesion_regions (CTA on RevealedCard is hidden
+            otherwise). */}
+        {mode === 'spotting' && caseMeta.recall?.lesion_regions && caseMeta.recall.lesion_regions.length > 0 && (
+          <LesionSpotCard
+            caseMeta={{ slug: caseMeta.slug, id: caseMeta.id }}
+            file={files[0]}
+            fileViewName={caseMeta.files?.[0]?.view_name}
+            regions={caseMeta.recall.lesion_regions}
+            onSubmit={onLesionSpotSubmit}
+            onExit={exitSpotting}
+          />
+        )}
       </div>
 
       {/* Source/license footer · always shown */}
