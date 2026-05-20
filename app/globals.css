@@ -109,28 +109,40 @@ body {
 .imaging-hero-bg {
   position: relative;
   isolation: isolate;
+  /* Scope paint and layout effects to this subtree so the rest of the page
+     doesn't repaint when the hero rerenders. Significant on long-scrolled
+     pages where the dropzone or recent-files list can rerender. */
+  contain: paint;
 }
 .imaging-hero-bg::before,
 .imaging-hero-bg::after {
   content: "";
   position: absolute;
-  inset: 0;
+  /* Constrain ambient layers to the top ~900px (covers hero + dropzone) so
+     we don't paint a giant gradient + noise over the entire scrollable page.
+     Previously these were inset:0 which painted across the whole vault. */
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 900px;
   z-index: -1;
   pointer-events: none;
 }
-/* Layer 1 — radial mesh blooms */
+/* Layer 1 — radial mesh blooms · GPU-composited gradients */
 .imaging-hero-bg::before {
   background:
     radial-gradient(60% 50% at 12% 0%, rgba(167, 139, 250, 0.16), transparent 70%),
     radial-gradient(50% 50% at 90% 30%, rgba(90, 204, 230, 0.12), transparent 75%),
     radial-gradient(40% 40% at 50% 100%, rgba(167, 139, 250, 0.06), transparent 75%);
 }
-/* Layer 2 — grain noise from SVG turbulence, very faint */
+/* Layer 2 — grain noise from SVG turbulence, very faint.
+   The data-uri is decoded once and tiled cheaply; constraining height avoids
+   compositing a turbulence layer the size of the whole page. */
 .imaging-hero-bg::after {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.04 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
   background-size: 180px 180px;
   mix-blend-mode: overlay;
-  opacity: 0.6;
+  opacity: 0.55;
 }
 
 /* ---------------------------------------------------------------------------
@@ -194,6 +206,7 @@ body {
 }
 .imaging-btn:active { transform: translateY(1px); }
 .imaging-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.imaging-btn:hover { will-change: transform, box-shadow; }
 
 .imaging-btn-primary {
   background: var(--color-tool-cyan);
@@ -244,10 +257,14 @@ body {
   text-decoration: none;
   color: inherit;
   overflow: hidden;
+  /* Only transform/opacity are GPU-composited; box-shadow + border-color
+     still trigger paint on hover but those fire ONCE per hover, not every
+     frame, so net perf cost is negligible. */
   transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1),
               border-color 220ms,
               background-color 220ms,
               box-shadow 320ms;
+  will-change: transform;
 }
 .imaging-tool-tile::after {
   content: "";
@@ -290,34 +307,44 @@ body {
 
 /* ---------------------------------------------------------------------------
  * Capability dot — animated breathing pulse on the brand accent
+ *
+ * Perf-conscious: uses transform: scale() on a pseudo-element ring instead of
+ * box-shadow animation. transform is GPU-composited (no paint per frame) so
+ * 4 dots pulsing continuously cost ~0 CPU vs box-shadow's 4× constant repaint.
  * --------------------------------------------------------------------------- */
 .imaging-cap-dot {
+  position: relative;
   display: inline-block;
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--color-tool-cyan);
-  box-shadow: 0 0 0 0 rgba(90, 204, 230, 0.5);
-  animation: imaging-cap-pulse 2.6s ease-out infinite;
+  /* Hint the browser to keep this on its own compositor layer */
+  will-change: transform;
 }
-.imaging-cap-dot.finalized {
-  background: var(--color-finalized);
-  box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.5);
-  animation-name: imaging-cap-pulse-green;
+.imaging-cap-dot::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid rgba(90, 204, 230, 0.5);
+  opacity: 0;
+  transform: scale(0.6);
+  animation: imaging-cap-pulse 2.6s ease-out infinite;
+  /* Promote to GPU layer */
+  will-change: transform, opacity;
+}
+.imaging-cap-dot.finalized { background: var(--color-finalized); }
+.imaging-cap-dot.finalized::after {
+  border-color: rgba(52, 211, 153, 0.5);
 }
 @keyframes imaging-cap-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(90, 204, 230, 0.4); }
-  60%  { box-shadow: 0 0 0 6px rgba(90, 204, 230, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(90, 204, 230, 0); }
-}
-@keyframes imaging-cap-pulse-green {
-  0%   { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.4); }
-  60%  { box-shadow: 0 0 0 6px rgba(52, 211, 153, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+  0%   { transform: scale(0.6); opacity: 0.9; }
+  70%  { transform: scale(2.4); opacity: 0; }
+  100% { transform: scale(2.4); opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .imaging-cap-dot,
-  .imaging-cap-dot.finalized { animation: none; box-shadow: none; }
+  .imaging-cap-dot::after { animation: none; opacity: 0; }
 }
 
 /* ---------------------------------------------------------------------------
