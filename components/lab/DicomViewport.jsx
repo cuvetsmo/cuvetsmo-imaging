@@ -8,6 +8,7 @@ import {
   ZoomTool,
   LengthTool,
   AngleTool,
+  StackScrollTool,
   annotation,
   Enums as ToolEnums,
 } from '@cornerstonejs/tools';
@@ -24,6 +25,13 @@ import {
   wlToVoiRange,
   formatPresetToast,
 } from '../../lib/dicom/wl-presets';
+import {
+  TOUCH_SLICE_THRESHOLD_PX,
+  clampIndex,
+  formatSlicePos,
+  indexFromKey,
+  sliceDeltaFromTouch,
+} from '../../lib/dicom/stack-scroll';
 
 // PRESETS = clinical W/L list (Bone · Soft · Lung · Auto) + DICOM reset.
 // Numeric values are HU-based standard radiology presets — see
@@ -86,7 +94,39 @@ const TOOLS = {
 
 let engineSeq = 0;
 
-export default function DicomViewport({ file, caseId = null, syncEnabled = false }) {
+export default function DicomViewport({
+  file,
+  files,
+  mode,
+  caseId = null,
+  syncEnabled = false,
+}) {
+  // Back-compat normalization. The legacy callsite passed `file: File`; the
+  // Phase 5 callsite passes `files: File[]` + `mode`. Convert single → array
+  // up front so the rest of the component only sees one shape. `mode` is
+  // explicit when the caller wants stack scroll on a multi-file study —
+  // otherwise we auto-pick: 1 file = 'single', 2+ = 'stack' (in this viewport
+  // — side-by-side is handled by the PARENT mounting two viewports).
+  const filesArray = files && files.length > 0
+    ? files
+    : (file ? [file] : []);
+  const resolvedMode = mode
+    || (filesArray.length <= 1 ? 'single' : 'stack');
+  const isStackMode = resolvedMode === 'stack' && filesArray.length > 1;
+  const sliceCount = filesArray.length;
+  // Stable key for the engine effect — recompute only when the actual file
+  // identities change (not every parent re-render). Comma-joined name+size
+  // is unique enough; the legacy single-file path matches `file?.name`.
+  const filesKey = filesArray
+    .map((f) => `${f.name}-${f.size}-${f.lastModified || 0}`)
+    .join('|');
+  // Primary file = first slice. Used by AI/Norberg/VHS overlays which read
+  // PixelSpacing / world coords from one anchor image. When the user scrolls
+  // through a CT stack we keep these overlays pinned to slice 0 for now —
+  // VHS / Norberg are radiograph tools so the cardiology + DJD use cases
+  // are single-slice anyway. Stack scrolling is for CT/MR readers.
+  const primaryFile = filesArray[0];
+
   const isMobile = useMediaQuery('(max-width: 600px)');
   const elRef = useRef(null);
   const engineRef = useRef(null);
@@ -96,9 +136,13 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
   const [errorMsg, setErrorMsg] = useState('');
   const [meta, setMeta] = useState(null);
   const [activeTool, setActiveTool] = useState('wl');
+  // Current slice index (0-based) in stack mode. `setImageIdIndex` is
+  // async, but we update React state synchronously on user input — the
+  // STACK_NEW_IMAGE listener reconciles in case of double-fire / race.
+  const [sliceIdx, setSliceIdx] = useState(0);
 
   useEffect(() => {
-    if (!file) return;
+    if (filesArray.length === 0) return;
     let cancelled = false;
     const seq = ++engineSeq;
     const engineId = `lab-engine-${seq}`;
@@ -114,7 +158,11 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
         if (cancelled || !elRef.current) return;
 
         const loader = getDicomImageLoader();
-        const imageId = loader.wadouri.fileManager.add(file);
+        // Phase 5 — register every file as an imageId so the StackViewport
+        // can scroll through all of them. For 1-file mode this is still a
+        // single-element array (Cornerstone's STACK viewport happily renders
+        // a 1-slice stack).
+        const imageIds = filesArray.map((f) => loader.wadouri.fileManager.add(f));
 
         const engine = new RenderingEngine(engineId);
         engineRef.current = engine;
@@ -124,10 +172,19 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
           element: elRef.current,
         });
         const viewport = engine.getViewport(viewportId);
-        await viewport.setStack([imageId]);
+        await viewport.setStack(imageIds);
+        // Always start at the first slice. Cornerstone preserves the last
+        // index from any previous setStack on the same viewport (we destroy
+        // the engine in cleanup so this is mostly defensive).
+        setSliceIdx(0);
 
         const tg = ToolGroupManager.createToolGroup(toolGroupId);
         Object.values(TOOLS).forEach(({ cls }) => tg.addTool(cls.toolName));
+        // Phase 5 — stack scroll tool is added regardless of mode, but only
+        // bound to wheel input when we're actually in stack mode. Adding it
+        // unconditionally keeps the tool group shape stable across mode
+        // transitions if we add a toolbar toggle later.
+        tg.addTool(StackScrollTool.toolName);
         tg.addViewport(viewportId, engineId);
         // Bindings include explicit numTouchPoints so single-finger
         // tap-and-drag on tablet/phone behaves the same as left-mouse-
@@ -152,6 +209,17 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
         tg.setToolActive(ZoomTool.toolName, {
           bindings: [{ mouseButton: ToolEnums.MouseBindings.Secondary }],
         });
+        // Phase 5 — bind StackScroll to mouse wheel ONLY in stack mode.
+        // Mouse wheel in single mode = browser scroll, which is the expected
+        // behavior on a single-slice page (no slices to advance through).
+        // The tool itself has Touch in supportedInteractionTypes, but we
+        // handle touch ourselves via pointer events to coexist with the
+        // primary-tool single-finger gesture (W/L drag, Pan).
+        if (isStackMode) {
+          tg.setToolActive(StackScrollTool.toolName, {
+            bindings: [{ mouseButton: ToolEnums.MouseBindings.Wheel }],
+          });
+        }
 
         viewport.render();
 
@@ -189,11 +257,15 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
         // Parse PatientSpeciesDescription (0010,2201) once, in parallel
         // with the Cornerstone load. Used by VHS overlay to pick the
         // right reference range (canine 8.5–10.5 vs feline 6.7–8.1).
+        // In stack mode we read the first file — species is a study-level
+        // attribute, so any instance carries the same value.
         try {
-          const buf = await file.arrayBuffer();
-          const ds = dicomParser.parseDicom(new Uint8Array(buf));
-          const sp = ds.string('x00102201') || '';
-          if (!cancelled && sp) setSpecies(sp);
+          if (primaryFile) {
+            const buf = await primaryFile.arrayBuffer();
+            const ds = dicomParser.parseDicom(new Uint8Array(buf));
+            const sp = ds.string('x00102201') || '';
+            if (!cancelled && sp) setSpecies(sp);
+          }
         } catch { /* dicom-parser failed; species stays empty */ }
         setStatus('ready');
         setActiveTool('wl');
@@ -214,7 +286,8 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
         engineRef.current?.destroy();
       } catch { /* noop */ }
     };
-  }, [file]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filesKey, isStackMode]);
 
   const getViewport = useCallback(() => {
     return engineRef.current?.getViewport(viewportIdRef.current);
@@ -383,7 +456,7 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
     setShowFirstHint(true);
     const t = setTimeout(() => setShowFirstHint(false), 6500);
     return () => clearTimeout(t);
-  }, [status, file]);
+  }, [status, filesKey]);
 
   // Track browser fullscreen so the toolbar button label flips.
   useEffect(() => {
@@ -427,13 +500,17 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
   const exportPng = useCallback(async () => {
     try {
       const mod = await import('../../lib/dicom/export-image.js');
-      const baseFilename = (file?.name || 'dicom').replace(/\.dcm$/i, '').replace(/\.dicom$/i, '') + '_annotated';
+      // In stack mode, append the current slice number to the filename
+      // so consecutive exports don't clobber each other.
+      const baseName = (primaryFile?.name || 'dicom').replace(/\.dcm$/i, '').replace(/\.dicom$/i, '');
+      const sliceSuffix = isStackMode && sliceCount > 1 ? `_slice-${sliceIdx + 1}-of-${sliceCount}` : '';
+      const baseFilename = `${baseName}${sliceSuffix}_annotated`;
       await mod.exportAnnotatedPng({ containerEl: elRef.current, baseFilename });
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('[exportPng] error:', err);
     }
-  }, [file]);
+  }, [primaryFile, isStackMode, sliceCount, sliceIdx]);
 
   const clearMeasurements = useCallback(() => {
     // Clear both Cornerstone annotations (Length/Angle) and any custom
@@ -544,7 +621,118 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
     return () => {
       element.removeEventListener(Enums.Events.VOI_MODIFIED, onVoiModified);
     };
-  }, [status, file]);
+  }, [status, filesKey]);
+
+  // Phase 5 — programmatic slice navigation. `setImageIdIndex` is async
+  // (Cornerstone fetches+decodes the next imageId), but we eagerly update
+  // React state so the indicator UI feels instant. The STACK_NEW_IMAGE
+  // listener below reconciles in case Cornerstone clamped or rejected the
+  // index (e.g. mid-load).
+  const goToSlice = useCallback((nextIdx) => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    const viewport = engine.getViewport(viewportIdRef.current);
+    if (!viewport || typeof viewport.setImageIdIndex !== 'function') return;
+    const total = typeof viewport.getNumberOfSlices === 'function'
+      ? viewport.getNumberOfSlices()
+      : sliceCount;
+    const clamped = clampIndex(nextIdx, total);
+    if (clamped < 0) return;
+    setSliceIdx(clamped);
+    // setImageIdIndex returns a promise; fire-and-forget is fine — render
+    // happens automatically once the image is decoded. Failures here are
+    // mostly "viewport unmounted mid-flight" which is harmless.
+    try { viewport.setImageIdIndex(clamped); } catch { /* noop */ }
+  }, [sliceCount]);
+
+  // Keep React state in sync with Cornerstone's internal index. Cornerstone
+  // fires STACK_NEW_IMAGE every time the visible slice changes, regardless
+  // of source (our keyboard handler, the StackScrollTool wheel binding, or
+  // our touch swipe). One listener catches all three input paths.
+  useEffect(() => {
+    if (status !== 'ready' || !isStackMode) return;
+    const element = elRef.current;
+    if (!element) return;
+    const onNewImage = () => {
+      const vp = engineRef.current?.getViewport(viewportIdRef.current);
+      if (!vp || typeof vp.getCurrentImageIdIndex !== 'function') return;
+      try {
+        const i = vp.getCurrentImageIdIndex();
+        setSliceIdx((cur) => (cur === i ? cur : i));
+      } catch { /* viewport torn down */ }
+    };
+    element.addEventListener(Enums.Events.STACK_NEW_IMAGE, onNewImage);
+    return () => {
+      element.removeEventListener(Enums.Events.STACK_NEW_IMAGE, onNewImage);
+    };
+  }, [status, isStackMode, filesKey]);
+
+  // Touch swipe → slice scroll. Vertical pointer drag on the canvas
+  // becomes slice navigation. Only active in stack mode AND when the
+  // current primary tool is one whose drag we can safely intercept —
+  // for W/L drag we yield (clinicians need that gesture), but for
+  // any non-drag tool (length/angle clicks, pan-via-aux, zoom-via-secondary)
+  // single-finger swipe works. Threshold = 18 px per slice.
+  //
+  // Implementation: use pointer events instead of touch events so we
+  // get the same path on mouse + finger + pen. Cornerstone's own touch
+  // bindings (numTouchPoints: 1 on the primary tool) compete for the
+  // same gesture though — we ONLY take over when activeTool is `null`,
+  // `pan`, `zoom` (right-button), or measurement tools that use click
+  // not drag. For 'wl' (default) and 'norberg'/'vhs' overlays we yield.
+  const stackSwipeRef = useRef({ active: false, startY: 0, accumY: 0 });
+  useEffect(() => {
+    if (status !== 'ready' || !isStackMode) return;
+    const element = elRef.current;
+    if (!element) return;
+    // Tools whose drag we MUST yield (they use drag for their primary
+    // interaction — W/L drag adjusts window/level, Pan drag pans, Length/
+    // Angle drag draws the measurement line). For those, we don't intercept
+    // pointer-move; the user can press Z first to free up the gesture.
+    // Norberg/VHS use click placement (no drag), so they're safe to scroll.
+    const yieldDragToTool = (tool) =>
+      tool === 'wl' || tool === 'pan' || tool === 'length' || tool === 'angle';
+
+    const onDown = (e) => {
+      if (yieldDragToTool(activeTool)) return;
+      // Multi-touch (pinch zoom) — yield to Cornerstone.
+      if (e.pointerType === 'touch' && e.isPrimary === false) return;
+      stackSwipeRef.current = { active: true, startY: e.clientY, accumY: 0 };
+    };
+    const onMove = (e) => {
+      const s = stackSwipeRef.current;
+      if (!s.active) return;
+      const dy = e.clientY - s.startY - s.accumY;
+      const step = sliceDeltaFromTouch(dy);
+      if (step !== 0) {
+        // Pull current index off the viewport (not React state — React
+        // state can lag a frame and we'd double-step). Falls back to
+        // sliceIdx if the viewport accessor isn't ready.
+        const vp = engineRef.current?.getViewport(viewportIdRef.current);
+        const curIdx = vp && typeof vp.getCurrentImageIdIndex === 'function'
+          ? vp.getCurrentImageIdIndex()
+          : sliceIdx;
+        goToSlice(curIdx + step);
+        s.accumY += step * TOUCH_SLICE_THRESHOLD_PX;
+      }
+    };
+    const onUp = () => {
+      stackSwipeRef.current = { active: false, startY: 0, accumY: 0 };
+    };
+
+    element.addEventListener('pointerdown', onDown);
+    element.addEventListener('pointermove', onMove);
+    element.addEventListener('pointerup', onUp);
+    element.addEventListener('pointercancel', onUp);
+    element.addEventListener('pointerleave', onUp);
+    return () => {
+      element.removeEventListener('pointerdown', onDown);
+      element.removeEventListener('pointermove', onMove);
+      element.removeEventListener('pointerup', onUp);
+      element.removeEventListener('pointercancel', onUp);
+      element.removeEventListener('pointerleave', onUp);
+    };
+  }, [status, isStackMode, activeTool, goToSlice, sliceIdx]);
 
   // Keyboard shortcuts. Bound at the window level but skip when the
   // user is typing in a form input (so other views aren't hijacked
@@ -574,6 +762,30 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
       if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return;
       // Don't hijack OS / browser shortcuts (Cmd+L, Ctrl+R, etc).
       if (e.altKey || e.ctrlKey || e.metaKey) return;
+
+      // Phase 5 — stack-scroll navigation. Arrow keys, PgUp/Dn, Home/End,
+      // Space. `indexFromKey` returns null for non-stack-keys so we fall
+      // through to the rest of the handler normally.
+      if (isStackMode && sliceCount > 1) {
+        const vp = engineRef.current?.getViewport(viewportIdRef.current);
+        const curIdx = vp && typeof vp.getCurrentImageIdIndex === 'function'
+          ? vp.getCurrentImageIdIndex()
+          : sliceIdx;
+        const nextIdx = indexFromKey(e.key, e.shiftKey, curIdx, sliceCount);
+        if (nextIdx !== null && nextIdx !== curIdx) {
+          goToSlice(nextIdx);
+          e.preventDefault();
+          return;
+        }
+        // null = not a stack-scroll key, fall through. Same-index = no-op
+        // (e.g. ArrowUp at slice 0), still preventDefault so the page
+        // doesn't scroll.
+        if (nextIdx !== null) {
+          e.preventDefault();
+          return;
+        }
+      }
+
       const k = e.key.toLowerCase();
       const sk = e.shiftKey;
 
@@ -678,6 +890,11 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
     toggleFullscreen,
     zoomBy,
     showToast,
+    // Phase 5 — stack-scroll deps
+    isStackMode,
+    sliceCount,
+    sliceIdx,
+    goToSlice,
   ]);
 
   return (
@@ -690,6 +907,34 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
               {isMobile ? TOOLS[t].short : TOOLS[t].label}
             </TBtn>
           ))}
+          {/* Phase 5 — stack-scroll controls. Only render when there's a
+              real stack to navigate (mode === 'stack' AND >1 slice). The
+              indicator pill doubles as a label + status (e.g. "📚 12 / 200").
+              Prev/Next buttons give mobile users a tap target equivalent to
+              the arrow keys; keyboard shortcut hint is in the title. */}
+          {isStackMode && sliceCount > 1 && (
+            <>
+              <Divider />
+              <TBtn
+                onClick={() => goToSlice(sliceIdx - 1)}
+                title="Previous slice (↑ / ← / PgUp -10)"
+                ariaPressed={false}
+              >◀</TBtn>
+              <span
+                style={sliceIndicatorStyle}
+                aria-live="polite"
+                aria-label={`Slice ${sliceIdx + 1} of ${sliceCount}`}
+                title="Slice indicator — use ↑/↓ arrows, PgUp/PgDn, Home/End, or scroll"
+              >
+                {isMobile ? '📚' : '📚 Slice'} {formatSlicePos(sliceIdx, sliceCount)}
+              </span>
+              <TBtn
+                onClick={() => goToSlice(sliceIdx + 1)}
+                title="Next slice (↓ / → / PgDn +10)"
+                ariaPressed={false}
+              >▶</TBtn>
+            </>
+          )}
           <Divider />
           {!isMobile && <span style={labelStyle}>Measure:</span>}
           {measureTools.map((t) => (
@@ -793,9 +1038,10 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
         {status === 'init' && (
           <div style={overlay}>
             <div style={spinnerStyle}>🔬</div>
-            <div>กำลังโหลด DICOM...</div>
+            <div>กำลังโหลด DICOM{isStackMode && sliceCount > 1 ? ` (${sliceCount} slices)` : ''}...</div>
             <div style={{ fontSize: '0.72rem', marginTop: 6, opacity: 0.6 }}>
-              {file?.name} · {(file?.size / 1024 | 0)} KB
+              {primaryFile?.name} · {(primaryFile?.size / 1024 | 0)} KB
+              {isStackMode && sliceCount > 1 && <> + {sliceCount - 1} more</>}
             </div>
           </div>
         )}
@@ -828,9 +1074,16 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
             <span style={{ opacity: 0.7, fontSize: '0.78em' }}>· กด <kbd style={kbdInlineStyle}>?</kbd> ดูทั้งหมด</span>
           </div>
         )}
+        {/* Norberg / VHS overlays are radiograph tools — single-slice by
+            design. We key off the primary (first) file so they stay anchored
+            to slice 0's anatomy. In stack mode, scrolling slices doesn't
+            invalidate the measurement (the overlay just renders over
+            whichever slice is currently visible — clinically that's a
+            display artifact rather than a bug since Norberg/VHS would not
+            be used on a CT stack anyway). */}
         {status === 'ready' && (
           <NorbergOverlay
-            key={`norberg-${file?.name}-${file?.size}-${file?.lastModified || 0}`}
+            key={`norberg-${primaryFile?.name}-${primaryFile?.size}-${primaryFile?.lastModified || 0}`}
             active={activeTool === 'norberg'}
             viewportRef={getViewport}
             caseId={caseId}
@@ -838,12 +1091,21 @@ export default function DicomViewport({ file, caseId = null, syncEnabled = false
         )}
         {status === 'ready' && (
           <VHSOverlay
-            key={`vhs-${file?.name}-${file?.size}-${file?.lastModified || 0}`}
+            key={`vhs-${primaryFile?.name}-${primaryFile?.size}-${primaryFile?.lastModified || 0}`}
             active={activeTool === 'vhs'}
             viewportRef={getViewport}
             caseId={caseId}
             species={species}
           />
+        )}
+        {/* Phase 5 — overlay slice indicator. Bottom-center, mirrors the
+            toast positioning but persistent (no fade) while in stack mode.
+            Keeps the "where am I in the stack" feedback visible even when
+            the user is in fullscreen and the toolbar pill is hidden. */}
+        {status === 'ready' && isStackMode && sliceCount > 1 && (
+          <div style={sliceOverlayStyle} aria-hidden>
+            {formatSlicePos(sliceIdx, sliceCount)}
+          </div>
         )}
         {/* Ephemeral toast — keyed on toast.id so each new toast
             restarts the CSS animation rather than continuing the
@@ -935,6 +1197,50 @@ const aiBtnLabelStyle = {
   lineHeight: 1.3,
   display: 'inline-flex',
   alignItems: 'center',
+};
+
+// Phase 5 — toolbar slice indicator. Reads "📚 Slice 12 / 200" inline with
+// the prev/next chevrons. Cyan ring matches the brand's active-state accent
+// so it reads as a status pill rather than a clickable control. `aria-live`
+// is set on the wrapping <span> so screen readers announce slice changes.
+const sliceIndicatorStyle = {
+  minHeight: 36,
+  padding: '6px 11px',
+  background: 'rgba(6,182,212,0.10)',
+  color: '#0e7490',
+  border: '1px solid rgba(6,182,212,0.45)',
+  borderRadius: 4,
+  fontSize: '0.82rem',
+  fontVariantNumeric: 'tabular-nums',
+  whiteSpace: 'nowrap',
+  lineHeight: 1.3,
+  display: 'inline-flex',
+  alignItems: 'center',
+  fontWeight: 600,
+  letterSpacing: 0.2,
+};
+
+// Phase 5 — canvas overlay slice indicator. Bottom-center, persistent
+// (not animated) while stack mode is active. Slightly larger + bolder than
+// the toolbar pill so the user sees it during fullscreen scrolling when
+// the toolbar is hidden. pointer-events: none so it never blocks the canvas.
+const sliceOverlayStyle = {
+  position: 'absolute',
+  bottom: 14,
+  left: '50%',
+  transform: 'translateX(-50%)',
+  zIndex: 20,
+  background: 'rgba(15, 23, 42, 0.78)',
+  color: '#fff',
+  padding: '6px 14px',
+  borderRadius: 999,
+  fontSize: '0.85rem',
+  fontWeight: 600,
+  fontVariantNumeric: 'tabular-nums',
+  letterSpacing: '0.04em',
+  pointerEvents: 'none',
+  boxShadow: '0 2px 10px rgba(0,0,0,0.32)',
+  whiteSpace: 'nowrap',
 };
 
 // First-load hint near the canvas, fades after 6.5 s.
@@ -1054,6 +1360,23 @@ const cheatsheetSections = [
       { key: 'C', desc: 'Clear all measurements' },
       { key: 'U', desc: 'Undo last Norberg/VHS point' },
       { key: '(drag)', desc: 'ลากจุด Norberg/VHS ที่วางแล้ว = ปรับตำแหน่ง' },
+    ],
+  },
+  {
+    // Phase 5 (Agent ⓐ) — stack-scroll keys. Only useful when the viewer
+    // is in stack mode (multi-slice study), but listed here unconditionally
+    // so the cheatsheet doubles as discovery doc.
+    title: 'Stack scroll (CT / MR series)',
+    rows: [
+      { key: '↓ / →', desc: 'Next slice' },
+      { key: '↑ / ←', desc: 'Previous slice' },
+      { key: 'PgDn', desc: 'Jump +10 slices' },
+      { key: 'PgUp', desc: 'Jump -10 slices' },
+      { key: 'Home', desc: 'First slice' },
+      { key: 'End', desc: 'Last slice' },
+      { key: 'Space', desc: 'Next slice (Shift+Space = previous)' },
+      { key: '(wheel)', desc: 'Mouse wheel = next/prev slice' },
+      { key: '(swipe)', desc: 'Vertical swipe on mobile = scroll slices' },
     ],
   },
   {

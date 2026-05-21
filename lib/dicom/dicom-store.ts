@@ -38,9 +38,16 @@ export interface Study {
 // ─── DB constants ────────────────────────────────────────────────────────────
 
 const DB_NAME = "cuvi-dicom-v1";
-const DB_VERSION = 1;
+// AGENT-B Phase 5: bump from v1 → v2 to add the `thumbnails` object store.
+// onupgradeneeded path below is additive — existing v1 stores are
+// preserved untouched, so this is a forward-compatible upgrade for users
+// with persisted Phase 4 studies.
+const DB_VERSION = 2;
 const STORE_INSTANCES = "instances";
 const STORE_STUDIES = "studies";
+// AGENT-B: thumbnail cache. Keyed by studyUid (one PNG per study, not
+// per series — first instance only).
+const STORE_THUMBNAILS = "thumbnails";
 
 // LRU eviction triggers when `used / available > EVICT_THRESHOLD`.
 // 0.85 leaves enough headroom that a single new batch of 100 MB won't
@@ -78,6 +85,18 @@ interface StoredStudy {
   addedAt: number;
 }
 
+// AGENT-B Phase 5: PNG thumbnail keyed by studyUid. Generated lazily by
+// the thumbnail worker pool after a `saveBatch` (or on StudyTree mount
+// when the cache lookup misses). Deleted alongside the parent study by
+// deleteStudy() / clearAll() / evictIfNeeded().
+interface StoredThumbnail {
+  studyUid: string;
+  /** Image PNG bytes (always image/png, 192×192 by default). */
+  blob: Blob;
+  /** Epoch ms when generated. Used for staleness checks. */
+  generatedAt: number;
+}
+
 // ─── Module state ────────────────────────────────────────────────────────────
 
 /** Lazy DB handle. `null` = not yet opened. `false` = IDB unavailable (private mode). */
@@ -90,6 +109,8 @@ let persistAttempted = false;
 const memoryFallback = {
   instances: new Map<string, StoredInstance>(),
   studies: new Map<string, StoredStudy>(),
+  // AGENT-B Phase 5: thumbnail cache, same fallback path.
+  thumbnails: new Map<string, StoredThumbnail>(),
   inUse: false,
 };
 
@@ -112,6 +133,12 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(STORE_STUDIES)) {
         db.createObjectStore(STORE_STUDIES, { keyPath: "studyUid" });
+      }
+      // AGENT-B Phase 5: v1 → v2 additive upgrade. Existing studies +
+      // instances are preserved; thumbnails are filled in lazily as the
+      // worker pool generates them.
+      if (!db.objectStoreNames.contains(STORE_THUMBNAILS)) {
+        db.createObjectStore(STORE_THUMBNAILS, { keyPath: "studyUid" });
       }
     };
     req.onsuccess = () => {
@@ -286,6 +313,8 @@ export async function loadAllStudies(): Promise<Study[]> {
 
 /**
  * Delete a single study (its summary + every instance under it).
+ * AGENT-B Phase 5: also drops the cached thumbnail for this study so
+ * the next import re-generates rather than serving the old preview.
  */
 export async function deleteStudy(studyUid: string): Promise<void> {
   const d = await db();
@@ -297,10 +326,12 @@ export async function deleteStudy(studyUid: string): Promise<void> {
       }
       memoryFallback.studies.delete(studyUid);
     }
+    // AGENT-B: drop cached thumbnail (independent of study presence).
+    memoryFallback.thumbnails.delete(studyUid);
     return;
   }
 
-  const t = tx(d, [STORE_INSTANCES, STORE_STUDIES], "readwrite");
+  const t = tx(d, [STORE_INSTANCES, STORE_STUDIES, STORE_THUMBNAILS], "readwrite");
   const studiesStore = t.objectStore(STORE_STUDIES);
   const instancesStore = t.objectStore(STORE_INSTANCES);
   const idx = instancesStore.index("by_study");
@@ -318,23 +349,110 @@ export async function deleteStudy(studyUid: string): Promise<void> {
   });
 
   studiesStore.delete(studyUid);
+  // AGENT-B Phase 5: nuke the thumbnail in the same tx so we never have
+  // an orphaned PNG pointing at a deleted study.
+  t.objectStore(STORE_THUMBNAILS).delete(studyUid);
   await txAsPromise(t);
 }
 
 /**
  * Nuke everything in the store.
+ * AGENT-B Phase 5: also clears the thumbnail cache.
  */
 export async function clearAll(): Promise<void> {
   const d = await db();
   if (!d) {
     memoryFallback.instances.clear();
     memoryFallback.studies.clear();
+    // AGENT-B: drop cached thumbnails too.
+    memoryFallback.thumbnails.clear();
     return;
   }
-  const t = tx(d, [STORE_INSTANCES, STORE_STUDIES], "readwrite");
+  const t = tx(d, [STORE_INSTANCES, STORE_STUDIES, STORE_THUMBNAILS], "readwrite");
   t.objectStore(STORE_INSTANCES).clear();
   t.objectStore(STORE_STUDIES).clear();
+  // AGENT-B Phase 5.
+  t.objectStore(STORE_THUMBNAILS).clear();
   await txAsPromise(t);
+}
+
+// ─── AGENT-B Phase 5: thumbnail cache API ────────────────────────────
+
+/**
+ * Persist a generated PNG thumbnail for a study. Overwrites any prior
+ * entry (re-generation is allowed, e.g. when the user manually clicks
+ * "regenerate"). The blob should already be the final 192×192 PNG.
+ */
+export async function saveThumbnail(
+  studyUid: string,
+  blob: Blob,
+): Promise<void> {
+  if (!studyUid) return;
+  const entry: StoredThumbnail = {
+    studyUid,
+    blob,
+    generatedAt: Date.now(),
+  };
+  const d = await db();
+  if (!d) {
+    memoryFallback.thumbnails.set(studyUid, entry);
+    return;
+  }
+  const t = tx(d, [STORE_THUMBNAILS], "readwrite");
+  t.objectStore(STORE_THUMBNAILS).put(entry);
+  await txAsPromise(t);
+}
+
+/**
+ * Read a cached thumbnail blob. Returns null if no entry exists.
+ */
+export async function loadThumbnail(studyUid: string): Promise<Blob | null> {
+  if (!studyUid) return null;
+  const d = await db();
+  if (!d) {
+    const got = memoryFallback.thumbnails.get(studyUid);
+    return got ? got.blob : null;
+  }
+  const t = tx(d, [STORE_THUMBNAILS], "readonly");
+  const got = (await reqAsPromise(t.objectStore(STORE_THUMBNAILS).get(studyUid))) as
+    | StoredThumbnail
+    | undefined;
+  await txAsPromise(t);
+  return got ? got.blob : null;
+}
+
+/**
+ * Bulk-load thumbnails for a list of studies. Returns a Map keyed by
+ * studyUid — entries are present only for studies that have a cached
+ * blob. Single transaction, one cursor walk.
+ */
+export async function loadThumbnailMap(
+  studyUids: string[],
+): Promise<Map<string, Blob>> {
+  const out = new Map<string, Blob>();
+  if (studyUids.length === 0) return out;
+  const d = await db();
+  if (!d) {
+    for (const uid of studyUids) {
+      const got = memoryFallback.thumbnails.get(uid);
+      if (got) out.set(uid, got.blob);
+    }
+    return out;
+  }
+  const t = tx(d, [STORE_THUMBNAILS], "readonly");
+  const store = t.objectStore(STORE_THUMBNAILS);
+  // One get per UID — same cost as a cursor for our typical set sizes
+  // (single-digit to low-hundreds studies).
+  await Promise.all(
+    studyUids.map(async (uid) => {
+      const got = (await reqAsPromise(store.get(uid))) as
+        | StoredThumbnail
+        | undefined;
+      if (got) out.set(uid, got.blob);
+    }),
+  );
+  await txAsPromise(t);
+  return out;
 }
 
 /**

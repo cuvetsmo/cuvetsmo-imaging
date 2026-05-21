@@ -13,12 +13,20 @@ import {
   MAX_BATCH_FILES,
   MAX_SIDE_BY_SIDE,
 } from '../../lib/dicom/bulk-import.ts';
+// AGENT-A Phase 5 — stack-mode auto-router for multi-instance studies.
+// Routes Study → single / stack / side-by-side based on instance count so
+// scrolling a 200-slice CT works out of the box from "Open study".
+import { autoModeForFiles } from '../../lib/dicom/stack-scroll';
 // Agent 🅱 — worker pool that parses DICOM headers in parallel.
 import { parseDicomBatch } from '../../lib/dicom/parse-pool.ts';
 // Agent 🅲 — pure Study/Series grouping over a flat DicomFileMeta[].
 import { organizeIntoStudies } from '../../lib/dicom/study-organizer.ts';
 // Agent 🅳 — IndexedDB-backed persistence + custom-event refresh signal.
-import { saveBatch } from '../../lib/dicom/dicom-store.ts';
+import { saveBatch, loadAllStudies, loadThumbnailMap, saveThumbnail } from '../../lib/dicom/dicom-store.ts';
+// AGENT-B Phase 5 — thumbnail worker pool. Generates 192×192 PNG previews
+// for each newly persisted study (off the main thread). Fires the
+// `cuvi:thumbnail-ready` event StudyCard subscribes to.
+import { generateThumbnailsForStudies } from '../../lib/dicom/thumbnail-pool.ts';
 
 const DicomViewport = lazy(() => import('./DicomViewport.jsx'));
 const TagInspector = lazy(() => import('./TagInspector.jsx'));
@@ -60,6 +68,11 @@ export default function LabHome() {
   // Side-by-side viewer state — unchanged. Capped at MAX_FILES (=2)
   // because the grid layout only renders two panes.
   const [files, setFiles] = useState([]);
+  // AGENT-A Phase 5 — viewer mode. Decides whether the viewer surface
+  // renders ONE pane with a scrollable stack, ONE pane with a single
+  // slice, or TWO panes side-by-side (legacy compare). Auto-derived by
+  // file count when not explicitly set via `openInMode(files, mode)`.
+  const [viewMode, setViewMode] = useState('single');
   const [error, setError] = useState(null);
   const [recent, setRecent] = useState([]);
 
@@ -94,6 +107,130 @@ export default function LabHome() {
       try { localStorage.setItem(RECENT_KEY, JSON.stringify(next)); } catch { /* quota */ }
       return next;
     });
+  }, []);
+
+  // AGENT-A Phase 5 — single entry point to open files in a specific
+  // viewer mode. If `mode` is omitted, autoModeForFiles picks: 1→single,
+  // 2→side-by-side, 3+→stack. Declared HERE (above runBulkImport)
+  // because runBulkImport's deps reference openInMode.
+  const openInMode = useCallback((nextFiles, mode) => {
+    if (!nextFiles || nextFiles.length === 0) {
+      setFiles([]);
+      setViewMode('single');
+      return;
+    }
+    const resolved = mode || autoModeForFiles(nextFiles.length);
+    setFiles(nextFiles);
+    setViewMode(resolved);
+  }, []);
+
+  // AGENT-B Phase 5 — Thumbnail pipeline.
+  //
+  // Pipeline trace (subscribed end-to-end so every persisted study ends
+  // up with a PNG preview):
+  //   1. runBulkImport finishes → fires `cuvi:imports-changed`
+  //   2. This effect listens to that event AND triggers an initial
+  //      pass on mount (covers page refreshes where the worker pool
+  //      died but the studies persist).
+  //   3. We loadAllStudies + loadThumbnailMap; diff to find which
+  //      studies are missing a cached PNG.
+  //   4. generateThumbnailsForStudies queues those into the worker pool
+  //      (≤4 workers, hardwareConcurrency-1).
+  //   5. On each completion: saveThumbnail to IDB → mint a fresh
+  //      ObjectURL → dispatch `cuvi:thumbnail-ready` with both the URL
+  //      and the underlying Blob. StudyCard subscribes to the event,
+  //      re-renders, and revokes the URL on unmount.
+  //
+  // AbortController on the effect's cleanup so a fast remount (HMR /
+  // page-nav) doesn't leak work into a stale pass.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let cancelled = false;
+    let controller = null;
+
+    const runPass = async () => {
+      if (cancelled) return;
+      // Always abort any prior in-flight pass before starting a new
+      // one — `cuvi:imports-changed` can fire back-to-back during a
+      // large folder drop, no point thumbnailing intermediate states.
+      if (controller) {
+        try { controller.abort(); } catch { /* noop */ }
+      }
+      controller = new AbortController();
+      const signal = controller.signal;
+
+      let studies = [];
+      try {
+        studies = await loadAllStudies();
+      } catch (err) {
+        console.warn('[LabHome thumb] loadAllStudies failed', err);
+        return;
+      }
+      if (cancelled || signal.aborted || studies.length === 0) return;
+
+      let cached;
+      try {
+        cached = await loadThumbnailMap(studies.map((s) => s.studyUid));
+      } catch (err) {
+        console.warn('[LabHome thumb] loadThumbnailMap failed', err);
+        cached = new Map();
+      }
+      if (cancelled || signal.aborted) return;
+
+      const missing = studies.filter((s) => !cached.has(s.studyUid));
+      if (missing.length === 0) return;
+
+      try {
+        await generateThumbnailsForStudies(
+          missing,
+          (studyUid, blob) => {
+            if (cancelled || signal.aborted) return;
+            // Persist first so a refresh doesn't kick us back to glyph.
+            saveThumbnail(studyUid, blob).catch((err) => {
+              console.warn('[LabHome thumb] saveThumbnail failed', err);
+            });
+            // Mint a URL the dispatcher owns; StudyCard treats event-
+            // supplied URLs as borrowed (revokes only its own).
+            const url = URL.createObjectURL(blob);
+            window.dispatchEvent(
+              new CustomEvent('cuvi:thumbnail-ready', {
+                detail: { studyUid, blob, url },
+              }),
+            );
+          },
+          {
+            signal,
+            // skip is redundant given our pre-filter, but adds safety
+            // if a thumbnail lands between the loadThumbnailMap snapshot
+            // and the worker dispatch.
+            skip: async (uid) => cached.has(uid),
+            onError: (uid, err) => {
+              console.warn(`[LabHome thumb] study ${uid} failed`, err.message);
+            },
+          },
+        );
+      } catch (err) {
+        if (!signal.aborted) {
+          console.warn('[LabHome thumb] generation pass failed', err);
+        }
+      }
+    };
+
+    // Kick the initial pass on mount.
+    void runPass();
+
+    // Re-run after every import.
+    const onChange = () => { void runPass(); };
+    window.addEventListener('cuvi:imports-changed', onChange);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('cuvi:imports-changed', onChange);
+      if (controller) {
+        try { controller.abort(); } catch { /* noop */ }
+      }
+    };
   }, []);
 
   /**
@@ -183,7 +320,8 @@ export default function LabHome() {
       // the viewer can start rendering Cornerstone while the worker
       // pool churns through the headers in the background.
       if (batch.length <= MAX_FILES) {
-        setFiles(batch);
+        // 1 file → single, 2 files → side-by-side (legacy behavior).
+        openInMode(batch, batch.length === 1 ? 'single' : 'side-by-side');
       }
 
       // ── Phase 4 pipeline: parse → organize → persist → broadcast ──
@@ -308,7 +446,7 @@ export default function LabHome() {
 
       abortRef.current = null;
     },
-    [addToRecent]
+    [addToRecent, openInMode]
   );
 
   const cancelImport = useCallback(() => {
@@ -358,39 +496,72 @@ export default function LabHome() {
 
   const reset = useCallback(() => {
     setFiles([]);
+    setViewMode('single');
     setError(null);
   }, []);
 
   const removeFileAt = useCallback((idx) => {
-    setFiles((prev) => prev.filter((_, i) => i !== idx));
+    setFiles((prev) => {
+      const next = prev.filter((_, i) => i !== idx);
+      // Dropping side-by-side back down to 1 file → switch to single mode
+      // so the remaining pane renders correctly. Stack mode can stay
+      // (you'd be removing the only slice, which goes back to empty).
+      if (next.length === 1) setViewMode('single');
+      else if (next.length === 0) setViewMode('single');
+      return next;
+    });
   }, []);
 
   const firstFile = files[0];
 
   // ── VIEWER MODE ──
+  //
+  // AGENT-A Phase 5 — three render branches:
+  //   stack        → ONE pane, all files passed as `files={...}` array,
+  //                  Cornerstone3D StackViewport scrolls through them.
+  //   side-by-side → N panes, each rendering one file in its own
+  //                  DicomViewport instance (legacy compare workflow).
+  //   single       → ONE pane, one file (legacy single-image workflow).
   if (files.length > 0) {
+    const headerSummary = viewMode === 'stack' && files.length > 1
+      ? `Stack (${files.length} slices) · ${firstFile.name}…`
+      : files.length === 1
+        ? `${firstFile.name} — ${(firstFile.size / 1024).toFixed(0)} KB`
+        : `Study (${files.length} views): ${files.map(f => f.name).join(' + ')}`;
     return (
       <div className="mx-auto max-w-7xl px-3 sm:px-5 py-4">
         <div className="flex justify-between items-center mb-3 gap-2 flex-wrap">
           <div className="text-sm text-[var(--color-text-muted)] font-mono">
-            {files.length === 1
-              ? `${firstFile.name} — ${(firstFile.size / 1024).toFixed(0)} KB`
-              : `Study (${files.length} views): ${files.map(f => f.name).join(' + ')}`}
+            {headerSummary}
           </div>
           <button onClick={reset} className="vmx-btn vmx-btn-ghost vmx-btn-sm">← Back to drop zone</button>
         </div>
 
-        <div style={files.length >= 2 ? studyGridStyle : undefined}>
-          {files.map((f, idx) => (
-            <ViewerPane
-              key={`${f.name}-${f.size}-${f.lastModified || 0}`}
-              file={f}
-              index={idx}
-              canRemove={files.length > 1}
-              onRemove={() => removeFileAt(idx)}
-            />
-          ))}
-        </div>
+        {viewMode === 'stack' ? (
+          // Single pane that owns the full stack — DicomViewport calls
+          // viewport.setStack(allImageIds) and binds StackScrollTool.
+          <ViewerPane
+            key={`stack-${firstFile.name}-${firstFile.size}-${files.length}`}
+            files={files}
+            mode="stack"
+            index={0}
+            canRemove={false}
+          />
+        ) : (
+          // Side-by-side (2 panes) or single (1 pane) — one DicomViewport
+          // per file. Preserves the legacy compare workflow.
+          <div style={files.length >= 2 ? studyGridStyle : undefined}>
+            {files.map((f, idx) => (
+              <ViewerPane
+                key={`${f.name}-${f.size}-${f.lastModified || 0}`}
+                file={f}
+                index={idx}
+                canRemove={files.length > 1}
+                onRemove={() => removeFileAt(idx)}
+              />
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -525,21 +696,41 @@ export default function LabHome() {
                   // ViewerPane reads .name + .size + .lastModified off
                   // a File, so unwrap before handing it over.
                   const f = meta?.fileHandle;
-                  if (f) setFiles([f]);
+                  if (f) openInMode([f], 'single');
                 }}
                 onOpenStudy={(study) => {
-                  // Flatten all series → instances → fileHandle, then
-                  // cap at the side-by-side viewer's 2-pane limit. For
-                  // bigger studies the user uses the per-instance row.
-                  const files = [];
-                  for (const s of study?.series || []) {
-                    for (const meta of s?.instances || []) {
-                      if (meta?.fileHandle) files.push(meta.fileHandle);
-                      if (files.length >= MAX_FILES) break;
+                  // AGENT-A Phase 5 — auto-mode-select based on instance
+                  // count of the LARGEST series. If a single series has
+                  // >2 instances → stack mode (load all into one viewport
+                  // and scroll). If the study has two single-instance
+                  // series → side-by-side compare (legacy). Otherwise
+                  // single-pane view of the first instance.
+                  //
+                  // Why "largest series" not "total instances": a study
+                  // with [series A: 200 slices, series B: 1 slice] should
+                  // stack-mode series A (the volume), not flatten both
+                  // into 201 mixed slices. We pick the longest series as
+                  // the representative — series B can be opened via the
+                  // per-instance row.
+                  const seriesList = study?.series || [];
+                  if (seriesList.length === 0) return;
+                  let longestSeries = seriesList[0];
+                  for (const s of seriesList) {
+                    if ((s.instances?.length || 0) > (longestSeries.instances?.length || 0)) {
+                      longestSeries = s;
                     }
-                    if (files.length >= MAX_FILES) break;
                   }
-                  if (files.length > 0) setFiles(files);
+                  const stackFiles = (longestSeries.instances || [])
+                    .map((m) => m?.fileHandle)
+                    .filter(Boolean);
+                  if (stackFiles.length === 0) return;
+                  if (stackFiles.length > 2) {
+                    openInMode(stackFiles, 'stack');
+                  } else if (stackFiles.length === 2) {
+                    openInMode(stackFiles, 'side-by-side');
+                  } else {
+                    openInMode(stackFiles, 'single');
+                  }
                 }}
               />
             </Suspense>
@@ -846,14 +1037,28 @@ function ToolTile({ href, title, desc, meta, art }) {
 }
 
 // Single viewer pane wrapper — file label + DicomViewport + Tag panel.
-function ViewerPane({ file, index, canRemove, onRemove }) {
+//
+// Accepts EITHER `file: File` (legacy single-image / side-by-side workflow)
+// OR `files: File[]` + `mode: 'stack'` (Phase 5 stack-scroll workflow).
+// The primary file (`primary`) is used for the header label + Tag inspector
+// (Tag inspector still views a single instance's DICOM tags — when scrolling
+// a stack the user would want to know "what tags does slice N have" which
+// is a future enhancement, not Phase 5 scope).
+function ViewerPane({ file, files, mode, index, canRemove, onRemove }) {
   const [showTags, setShowTags] = useState(false);
+  const isStackPane = mode === 'stack' && Array.isArray(files) && files.length > 1;
+  const primary = isStackPane ? files[0] : file;
   return (
     <div style={paneStyle}>
       <div style={paneHeaderStyle}>
         <span>
-          <strong>View {index + 1}:</strong>{' '}
-          <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>{file.name}</span>
+          <strong>{isStackPane ? 'Stack' : `View ${index + 1}`}:</strong>{' '}
+          <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>
+            {primary?.name}
+            {isStackPane && (
+              <> · {files.length} slices</>
+            )}
+          </span>
         </span>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           <button
@@ -874,11 +1079,15 @@ function ViewerPane({ file, index, canRemove, onRemove }) {
         </div>
       </div>
       <Suspense fallback={<div style={loadingFallbackStyle}>กำลังโหลด viewer...</div>}>
-        <DicomViewport file={file} caseId={null} syncEnabled={false} />
+        {isStackPane ? (
+          <DicomViewport files={files} mode="stack" caseId={null} syncEnabled={false} />
+        ) : (
+          <DicomViewport file={primary} caseId={null} syncEnabled={false} />
+        )}
       </Suspense>
       {showTags && (
         <Suspense fallback={null}>
-          <TagInspector file={file} onClose={() => setShowTags(false)} />
+          <TagInspector file={primary} onClose={() => setShowTags(false)} />
         </Suspense>
       )}
     </div>

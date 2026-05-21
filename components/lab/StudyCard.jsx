@@ -1,10 +1,16 @@
 'use client';
-import { useState, useId, useCallback, useMemo } from 'react';
+import { useState, useId, useCallback, useMemo, useEffect } from 'react';
 import { studySummary, modalityToKey } from '../../lib/dicom/study-organizer';
+// AGENT-B Phase 5: lazy thumbnail load from IDB on mount, subscribe to
+// `cuvi:thumbnail-ready` so re-renders happen as the worker pool emits.
+import { loadThumbnail } from '../../lib/dicom/dicom-store';
 
 // StudyCard — single-study panel in the imported-studies list.
 //
 // Layout (mobile-first 375px, scales to wider):
+//   [Thumbnail]     192×192 (96 on mobile) preview · first instance pixel
+//                   render with W/L mapping. Falls back to modality glyph
+//                   while generation is in flight or if PNG unavailable.
 //   [Header row]    pt-XXXXXXXX   |   modality chip(s)   |   trash
 //   [Title]         study description (or studyUid fallback)
 //   [Meta line]     date · N series · M images
@@ -18,6 +24,11 @@ import { studySummary, modalityToKey } from '../../lib/dicom/study-organizer';
 // same 2-step confirm pattern Palm prefers (first click swaps icon to
 // "Sure?", second click within 4s commits). Avoids destructive misclicks
 // on mobile where the trash sits near the card's tap target.
+//
+// 2026-05-21 — AGENT-B Phase 5 added thumbnail slot. Cache lookup runs
+// once per study on mount; if absent, we render a "generating..." skeleton
+// + glyph and wait for the LabHome-emitted `cuvi:thumbnail-ready` event
+// to fill it in. URL.createObjectURL is revoked on unmount to avoid leaks.
 
 export default function StudyCard({
   study,
@@ -26,7 +37,74 @@ export default function StudyCard({
   onDeleteStudy,
 }) {
   const summary = useMemo(() => studySummary(study), [study]);
+  // AGENT-A Phase 5 — peek at the largest series to decide whether the
+  // "Open study" button promises stack-scroll or just opens the first
+  // instance(s). Cheap O(series-count) reduce; recomputed only when the
+  // study object identity changes (RecentImports replaces it wholesale
+  // on each refresh).
+  const longestSeriesInstanceCount = useMemo(() => {
+    let max = 0;
+    for (const s of study?.series || []) {
+      const n = s.instances?.length || 0;
+      if (n > max) max = n;
+    }
+    return max;
+  }, [study]);
   const titleId = useId();
+
+  // AGENT-B Phase 5: thumbnail object URL. Null = not yet loaded /
+  // generated. Initial mount tries the IDB cache; the LabHome event
+  // listener fills the gap on a `cuvi:thumbnail-ready` dispatch.
+  const [thumbUrl, setThumbUrl] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let lastUrl = null;
+    // Cache lookup on mount + on study change.
+    (async () => {
+      try {
+        const blob = await loadThumbnail(study.studyUid);
+        if (cancelled || !blob) return;
+        lastUrl = URL.createObjectURL(blob);
+        setThumbUrl(lastUrl);
+      } catch {
+        /* no thumb yet — fallback glyph stays */
+      }
+    })();
+    // Subscribe to the LabHome-emitted ready event.
+    const onReady = (e) => {
+      const detail = e?.detail;
+      if (!detail || detail.studyUid !== study.studyUid) return;
+      if (cancelled) return;
+      // Prefer the URL the dispatcher already minted if present, else
+      // mint our own from the blob payload.
+      let nextUrl = detail.url;
+      if (!nextUrl && detail.blob) {
+        nextUrl = URL.createObjectURL(detail.blob);
+      }
+      if (!nextUrl) return;
+      // Revoke any previous URL we created (event-supplied URLs are
+      // owned by the dispatcher and outlive us, so we only revoke our
+      // own).
+      if (lastUrl && lastUrl !== nextUrl) {
+        URL.revokeObjectURL(lastUrl);
+      }
+      lastUrl = nextUrl;
+      setThumbUrl(nextUrl);
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('cuvi:thumbnail-ready', onReady);
+    }
+    return () => {
+      cancelled = true;
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('cuvi:thumbnail-ready', onReady);
+      }
+      if (lastUrl) {
+        try { URL.revokeObjectURL(lastUrl); } catch { /* noop */ }
+      }
+    };
+  }, [study.studyUid]);
 
   // Two-step delete: first click = arm, second click = commit. Auto-disarm
   // after 4s so a finger-slip doesn't stay "live" forever.
@@ -75,6 +153,28 @@ export default function StudyCard({
         </div>
       </div>
 
+      {/* AGENT-B Phase 5 — Thumbnail slot. Shows the rendered PNG once
+          the worker pool fills the cache; falls back to a modality glyph
+          tile while generation is in flight. The img has alt="" because
+          the title text below already describes the study (a11y:
+          decorative). */}
+      <div style={thumbWrapStyle(modalityKey)}>
+        {thumbUrl ? (
+          <img
+            src={thumbUrl}
+            alt=""
+            decoding="async"
+            loading="lazy"
+            style={thumbImgStyle}
+          />
+        ) : (
+          <div style={thumbGlyphStyle} aria-hidden="true">
+            {modalityGlyph(modalityKey)}
+            <span style={thumbGenLabelStyle}>generating…</span>
+          </div>
+        )}
+      </div>
+
       {/* Title */}
       <h3 id={titleId} style={titleStyle}>
         {displayTitle}
@@ -100,13 +200,23 @@ export default function StudyCard({
         ))}
       </div>
 
-      {/* Footer CTA — open the whole study */}
+      {/* Footer CTA — open the whole study.
+          AGENT-A Phase 5 — when the largest series has >2 instances, the
+          parent's onOpenStudy handler routes through to stack mode (one
+          viewport, scrollable). The button label hints at this so the user
+          knows what they're getting. The handler itself lives in LabHome's
+          onOpenStudy callback; we just expose the affordance here. */}
       <button
         type="button"
         onClick={() => onOpenStudy?.(study)}
         style={openAllBtnStyle}
+        title={longestSeriesInstanceCount > 2
+          ? `Open as scrollable stack (${longestSeriesInstanceCount} slices)`
+          : 'Open study'}
       >
-        Open study →
+        {longestSeriesInstanceCount > 2
+          ? `📚 Open as stack (${longestSeriesInstanceCount} slices) →`
+          : 'Open study →'}
       </button>
     </section>
   );
@@ -182,6 +292,17 @@ function modalityShortLabel(k) {
   if (k === 'mri') return 'MRI';
   if (k === 'us') return 'US';
   return 'Other';
+}
+
+// AGENT-B Phase 5 — modality emoji used as the fallback when no
+// thumbnail PNG is cached yet. Mirrors the dot palette colour mapping
+// so the glyph reads as part of the same visual language.
+function modalityGlyph(k) {
+  if (k === 'xray') return '🦴';
+  if (k === 'ct') return '🧠';
+  if (k === 'mri') return '🧲';
+  if (k === 'us') return '🫧';
+  return '🖼';
 }
 
 // Modality palette — matches CaseLibraryLocal.jsx so the visual language
@@ -412,6 +533,69 @@ const instanceUidStyle = {
 const instanceArrowStyle = {
   color: 'var(--color-tool-cyan)',
   flexShrink: 0,
+};
+
+// ── AGENT-B Phase 5 — Thumbnail slot styles ─────────────────────────────
+// Square aspect-ratio container so the layout doesn't shift between
+// "generating glyph" and the loaded PNG. Mobile-first: 96×96 on narrow
+// viewports (we control via aspect-ratio + max-width), expands to fill
+// the card width on wider screens up to 192px tall — but always 1:1.
+// Backed by a faint modality-tinted gradient so the glyph fallback
+// doesn't look like a dropped image.
+
+function thumbWrapStyle(k) {
+  const tint = {
+    xray: 'rgba(90, 204, 230, 0.06)',
+    ct: 'rgba(255, 154, 90, 0.06)',
+    mri: 'rgba(167, 139, 250, 0.06)',
+    us: 'rgba(52, 211, 153, 0.05)',
+    other: 'rgba(255, 255, 255, 0.03)',
+  };
+  return {
+    width: '100%',
+    aspectRatio: '1 / 1',
+    maxHeight: 192,
+    margin: '2px 0',
+    borderRadius: 8,
+    overflow: 'hidden',
+    background: `linear-gradient(180deg, ${tint[k] || tint.other} 0%, rgba(0,0,0,0.4) 100%)`,
+    border: '1px solid var(--color-border)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    // Subtle skeleton shimmer while empty — a 12% opacity static dark
+    // band rather than a CSS keyframe pulse (Palm dislikes box-shadow
+    // keyframe animations; this is content-shaped passive shading).
+  };
+}
+
+const thumbImgStyle = {
+  width: '100%',
+  height: '100%',
+  objectFit: 'contain',
+  display: 'block',
+  background: '#06070A',
+};
+
+const thumbGlyphStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 6,
+  fontSize: '2.4rem',
+  lineHeight: 1,
+  color: 'var(--color-text-faint)',
+  opacity: 0.85,
+};
+
+const thumbGenLabelStyle = {
+  fontSize: '0.62rem',
+  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+  color: 'var(--color-text-faint)',
+  letterSpacing: '0.12em',
+  textTransform: 'uppercase',
 };
 
 const openAllBtnStyle = {

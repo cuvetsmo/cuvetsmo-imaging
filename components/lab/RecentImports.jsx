@@ -8,6 +8,9 @@ import {
   isUsingMemoryFallback,
   loadAllStudies,
 } from '../../lib/dicom/dicom-store';
+// AGENT-E: Phase 5 PII scrubber + downloadable ZIP. Mounted as a sibling
+// section below StudyTree so we don't have to touch StudyCard / StudyTree.
+import AnonymizeAction from './AnonymizeAction.jsx';
 
 // StudyTree (Agent 🅲) lives at ./StudyTree.jsx by the Phase 4 file contract.
 // We lazy-import to (a) keep this panel's first paint cheap and (b) survive
@@ -279,10 +282,58 @@ export default function RecentImports({ onOpenInstance, onOpenStudy } = {}) {
               onOpenStudy={onOpenStudy}
             />
           </Suspense>
+
+          {/* AGENT-E: per-study PII anonymizer + ZIP downloader. Rendered as a
+              sibling row below StudyTree so we don't have to modify the card
+              component. Each row carries the study label + the action button. */}
+          <AnonymizePanel studies={state.studies} />
         </div>
       )}
     </section>
   );
+}
+
+// AGENT-E: compact list rendering one AnonymizeAction per persisted study.
+// Lives outside StudyTree so the StudyCard component (owned by another
+// agent) stays untouched. Keep it visually de-emphasized — the trash icon
+// inside StudyCard is the high-traffic destructive control; this is the
+// lower-frequency "share-prep" tool.
+function AnonymizePanel({ studies }) {
+  if (!Array.isArray(studies) || studies.length === 0) return null;
+  return (
+    <section className={panelStyles.anonWrap} aria-label="Anonymize and download studies">
+      <h4 className={panelStyles.anonHeader}>
+        🛡️ Share-ready ZIP
+        <span className={panelStyles.anonHeaderMeta}>
+          {' '}— strip 22 PII tags + download per study
+        </span>
+      </h4>
+      <ul className={panelStyles.anonList}>
+        {studies.map((s) => (
+          <li key={s.studyUid} className={panelStyles.anonItem}>
+            <div className={panelStyles.anonLabel}>
+              <span className={panelStyles.anonTitle}>
+                {s.studyDescription
+                  || (s.patientId ? `Study · ${s.patientId}` : 'Untitled study')}
+              </span>
+              <span className={panelStyles.anonSub}>
+                {countInstances(s)} {countInstances(s) === 1 ? 'image' : 'images'}
+                {s.acquisitionDate ? ` · ${formatDicomDate(s.acquisitionDate)}` : ''}
+              </span>
+            </div>
+            <AnonymizeAction study={s} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function countInstances(study) {
+  if (!study?.series) return 0;
+  let n = 0;
+  for (const ser of study.series) n += ser.instances.length;
+  return n;
 }
 
 // ─── Fallback list (only used when Agent 🅲's StudyTree isn't shipped) ──────
@@ -402,4 +453,21 @@ const panelStyles = {
     'text-sm text-[var(--color-text)] truncate',
   fallbackMeta:
     'text-xs text-[var(--color-text-muted)] font-mono',
+  // AGENT-E: anonymize panel styles. De-emphasized vs the main StudyTree.
+  anonWrap:
+    'mt-3 pt-3 border-t border-dashed border-[var(--color-border)] space-y-2',
+  anonHeader:
+    'text-xs uppercase tracking-wider font-semibold text-[var(--color-text)] m-0',
+  anonHeaderMeta:
+    'font-mono normal-case tracking-normal text-[var(--color-text-muted)] font-normal',
+  anonList:
+    'list-none p-0 m-0 flex flex-col gap-2',
+  anonItem:
+    'flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-md border border-[var(--color-border)] bg-[rgba(255,255,255,0.02)] px-3 py-2',
+  anonLabel:
+    'flex flex-col min-w-0 flex-1',
+  anonTitle:
+    'text-xs text-[var(--color-text)] truncate',
+  anonSub:
+    'text-[0.68rem] text-[var(--color-text-muted)] font-mono',
 };
