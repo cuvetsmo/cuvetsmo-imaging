@@ -7,6 +7,7 @@ DICOM viewer + radiology overlays (Norberg angle, VHS) + image occlusion editor 
 **Part of [CUVETSMO Labs](https://labs.cuvetsmo.com)** — experimental tools by [CUVETSMO](https://cuvetsmo.com) (Chulalongkorn Veterinary Student Council).
 
 Sibling labs:
+- 🤖 [ai.cuvetsmo.com](https://ai.cuvetsmo.com) — Free Thai AI chatbot, no login, with citations
 - 🪙 [web3.cuvetsmo.com](https://web3.cuvetsmo.com) — Web3 playground on Base Sepolia
 - 🧪 [labs.cuvetsmo.com](https://labs.cuvetsmo.com) — Labs umbrella index
 

@@ -11,11 +11,12 @@ import Image from "next/image";
  * cuvetsmo.com under partner tier with copy that names Palm as author.
  */
 
-type EcosystemSite = "main" | "web3" | "labs" | "imaging";
+type EcosystemSite = "main" | "web3" | "labs" | "imaging" | "ai";
 
 const SITES: { id: EcosystemSite; label: string; href: string; logo: string }[] = [
   { id: "main",    label: "cuvetsmo.com", href: "https://cuvetsmo.com",         logo: "/smo-logo.png" },
   { id: "labs",    label: "labs",         href: "https://labs.cuvetsmo.com",    logo: "/labs-logo-mark.png" },
+  { id: "ai",      label: "ai",           href: "https://ai.cuvetsmo.com",      logo: "/ai-logo-mark.svg" },
   { id: "web3",    label: "web3",         href: "https://web3.cuvetsmo.com",    logo: "/web3-logo-mark.png" },
   { id: "imaging", label: "imaging",      href: "https://imaging.cuvetsmo.com", logo: "/imaging-logo-mark.png" },
 ];
