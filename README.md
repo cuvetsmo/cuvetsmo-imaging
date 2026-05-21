@@ -1,3 +1,17 @@
+# 🩻 CUVETSMO Imaging
+
+DICOM viewer + radiology overlays (Norberg angle, VHS) + image occlusion editor for veterinary students at Chulalongkorn University.
+
+🌐 **Live:** [imaging.cuvetsmo.com](https://imaging.cuvetsmo.com)
+
+**Part of [CUVETSMO Labs](https://labs.cuvetsmo.com)** — experimental tools by [CUVETSMO](https://cuvetsmo.com) (Chulalongkorn Veterinary Student Council).
+
+Sibling labs:
+- 🪙 [web3.cuvetsmo.com](https://web3.cuvetsmo.com) — Web3 playground on Base Sepolia
+- 🧪 [labs.cuvetsmo.com](https://labs.cuvetsmo.com) — Labs umbrella index
+
+---
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
