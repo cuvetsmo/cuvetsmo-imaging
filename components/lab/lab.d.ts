@@ -38,3 +38,9 @@ declare module "@/components/occlusion/OcclusionView.jsx" {
   const Component: ComponentType;
   export default Component;
 }
+
+declare module "@/components/lab/RecentImports.jsx" {
+  import type { ComponentType } from "react";
+  const Component: ComponentType;
+  export default Component;
+}
