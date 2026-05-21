@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
+    "prebuild": "node --experimental-strip-types scripts/sync-cases-json.mjs",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "sync:cases": "node --experimental-strip-types scripts/sync-cases-json.mjs"
   },
   "dependencies": {
     "@cornerstonejs/core": "^4.22.4",

@@ -31,6 +31,7 @@ import {
   formatSlicePos,
   indexFromKey,
   sliceDeltaFromTouch,
+  proportionalSliceIndex,
 } from '../../lib/dicom/stack-scroll';
 
 // PRESETS = clinical W/L list (Bone · Soft · Lung · Auto) + DICOM reset.
@@ -100,6 +101,15 @@ export default function DicomViewport({
   mode,
   caseId = null,
   syncEnabled = false,
+  // Phase 6 (Agent ⓐ) — sync-compare props.
+  // syncGroupId scopes window events so two compare pairs on the same
+  // page (rare today but cheap to support) don't cross-fire. Default
+  // 'default' matches the legacy 2-up camera-sync behavior.
+  syncGroupId = 'default',
+  // paneLabel ('L' / 'R' / null) is rendered next to the slice indicator
+  // pill so the user can tell at a glance which pane is which in
+  // side-by-side-stack mode. Null hides the prefix (single pane / legacy).
+  paneLabel = null,
 }) {
   // Back-compat normalization. The legacy callsite passed `file: File`; the
   // Phase 5 callsite passes `files: File[]` + `mode`. Convert single → array
@@ -542,48 +552,137 @@ export default function DicomViewport({
   // incoming setCamera() would trigger CAMERA_MODIFIED locally which
   // would emit again → infinite loop. requestAnimationFrame resets
   // the flag AFTER the local CAMERA_MODIFIED bounce arrives.
+  //
+  // Phase 6 (Agent ⓐ) — extended to also sync STACK_NEW_IMAGE (slice
+  // index) when both panes are in stack mode. Two separate
+  // `isApplying` flags so a slice-change doesn't accidentally gate
+  // the user's NEXT camera adjustment (and vice-versa) — the bounces
+  // are independent events on the same element.
+  //
+  // syncGroupId scopes the window events so multiple compare pairs
+  // could coexist on the page. The detail payload carries `totalSlices`
+  // so the receiver can map proportionally when stack lengths differ
+  // (e.g. compare a 36-slice C-spine to a 40-slice repeat).
   useEffect(() => {
     if (!syncEnabled || status !== 'ready') return;
     const element = elRef.current;
     if (!element) return;
     const myId = viewportIdRef.current;
-    let isApplying = false;
+    let isApplyingCamera = false;
+    let isApplyingSlice = false;
+    // Resolve the sync channel name once. 'default' keeps the legacy
+    // event name so older callers (Phase 5 2-up compare) still get
+    // delivered. Any other group ID gets a per-group suffix.
+    const cameraEvent = syncGroupId === 'default'
+      ? 'vmx-lab-sync-camera'
+      : `vmx-lab-sync-camera:${syncGroupId}`;
+    const sliceEvent = syncGroupId === 'default'
+      ? 'vmx-lab-sync-slice'
+      : `vmx-lab-sync-slice:${syncGroupId}`;
 
     const onCameraChange = () => {
-      if (isApplying) return;
+      if (isApplyingCamera) return;
       const vp = engineRef.current?.getViewport(myId);
       if (!vp) return;
       try {
         const cam = vp.getCamera();
-        window.dispatchEvent(new CustomEvent('vmx-lab-sync-camera', {
-          detail: { sourceId: myId, camera: cam },
+        window.dispatchEvent(new CustomEvent(cameraEvent, {
+          detail: { sourceId: myId, syncGroupId, camera: cam },
         }));
       } catch { /* viewport torn down mid-event */ }
     };
 
     const onRemoteCamera = (evt) => {
       if (!evt?.detail || evt.detail.sourceId === myId) return;
+      if (evt.detail.syncGroupId && evt.detail.syncGroupId !== syncGroupId) return;
       const vp = engineRef.current?.getViewport(myId);
       if (!vp) return;
       try {
-        isApplying = true;
+        isApplyingCamera = true;
         vp.setCamera(evt.detail.camera);
         vp.render();
-        requestAnimationFrame(() => { isApplying = false; });
+        requestAnimationFrame(() => { isApplyingCamera = false; });
       } catch (err) {
         // eslint-disable-next-line no-console
-        console.error('[viewport-sync] apply error:', err);
-        isApplying = false;
+        console.error('[viewport-sync] camera apply error:', err);
+        isApplyingCamera = false;
+      }
+    };
+
+    // Slice-index sync — only active when this pane is in stack mode.
+    // STACK_NEW_IMAGE fires on every visible-slice change (wheel · arrows
+    // · touch swipe · programmatic). We re-dispatch as a window event;
+    // the twin pane catches it and calls setImageIdIndex(mapped).
+    //
+    // isApplyingSlice gates the bounce: when we call setImageIdIndex
+    // here, STACK_NEW_IMAGE fires locally, and without the flag we'd
+    // re-dispatch a window event that the twin pane already sent us →
+    // ping-pong loop. requestAnimationFrame resets after the local
+    // bounce arrives.
+    const onLocalNewImage = () => {
+      if (!isStackMode) return;
+      if (isApplyingSlice) return;
+      const vp = engineRef.current?.getViewport(myId);
+      if (!vp || typeof vp.getCurrentImageIdIndex !== 'function') return;
+      try {
+        const i = vp.getCurrentImageIdIndex();
+        const total = typeof vp.getNumberOfSlices === 'function'
+          ? vp.getNumberOfSlices()
+          : sliceCount;
+        window.dispatchEvent(new CustomEvent(sliceEvent, {
+          detail: { sourceId: myId, syncGroupId, sliceIdx: i, totalSlices: total },
+        }));
+      } catch { /* viewport torn down mid-event */ }
+    };
+
+    const onRemoteSlice = (evt) => {
+      if (!evt?.detail || evt.detail.sourceId === myId) return;
+      if (evt.detail.syncGroupId && evt.detail.syncGroupId !== syncGroupId) return;
+      // If we're not in stack mode, ignore — there's nothing to scroll.
+      if (!isStackMode) return;
+      const vp = engineRef.current?.getViewport(myId);
+      if (!vp || typeof vp.setImageIdIndex !== 'function') return;
+      try {
+        const myTotal = typeof vp.getNumberOfSlices === 'function'
+          ? vp.getNumberOfSlices()
+          : sliceCount;
+        const target = proportionalSliceIndex(
+          evt.detail.sliceIdx,
+          evt.detail.totalSlices,
+          myTotal,
+        );
+        const cur = typeof vp.getCurrentImageIdIndex === 'function'
+          ? vp.getCurrentImageIdIndex()
+          : -1;
+        if (target === cur) return; // already there — skip the bounce entirely
+        isApplyingSlice = true;
+        // Eager React-state update so the indicator pill doesn't lag.
+        setSliceIdx(target);
+        vp.setImageIdIndex(target);
+        // setImageIdIndex is async — the STACK_NEW_IMAGE bounce arrives
+        // on a later task. rAF puts us comfortably past it for typical
+        // load latencies; if the decode is slow the flag may flip back
+        // before STACK_NEW_IMAGE fires, but the early-return on
+        // (target === cur) above catches that case so no infinite loop.
+        requestAnimationFrame(() => { isApplyingSlice = false; });
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('[viewport-sync] slice apply error:', err);
+        isApplyingSlice = false;
       }
     };
 
     element.addEventListener(Enums.Events.CAMERA_MODIFIED, onCameraChange);
-    window.addEventListener('vmx-lab-sync-camera', onRemoteCamera);
+    window.addEventListener(cameraEvent, onRemoteCamera);
+    element.addEventListener(Enums.Events.STACK_NEW_IMAGE, onLocalNewImage);
+    window.addEventListener(sliceEvent, onRemoteSlice);
     return () => {
       element.removeEventListener(Enums.Events.CAMERA_MODIFIED, onCameraChange);
-      window.removeEventListener('vmx-lab-sync-camera', onRemoteCamera);
+      window.removeEventListener(cameraEvent, onRemoteCamera);
+      element.removeEventListener(Enums.Events.STACK_NEW_IMAGE, onLocalNewImage);
+      window.removeEventListener(sliceEvent, onRemoteSlice);
     };
-  }, [syncEnabled, status]);
+  }, [syncEnabled, status, syncGroupId, isStackMode, sliceCount]);
 
   // W/L drift detection — when the user drags W/L via the
   // WindowLevelTool after a preset is applied, the cyan ring should
@@ -923,10 +1022,11 @@ export default function DicomViewport({
               <span
                 style={sliceIndicatorStyle}
                 aria-live="polite"
-                aria-label={`Slice ${sliceIdx + 1} of ${sliceCount}`}
+                aria-label={`${paneLabel ? `${paneLabel} pane, ` : ''}Slice ${sliceIdx + 1} of ${sliceCount}`}
                 title="Slice indicator — use ↑/↓ arrows, PgUp/PgDn, Home/End, or scroll"
               >
-                {isMobile ? '📚' : '📚 Slice'} {formatSlicePos(sliceIdx, sliceCount)}
+                {paneLabel ? `${paneLabel}: ` : (isMobile ? '📚 ' : '📚 Slice ')}
+                {formatSlicePos(sliceIdx, sliceCount)}
               </span>
               <TBtn
                 onClick={() => goToSlice(sliceIdx + 1)}
@@ -1101,10 +1201,13 @@ export default function DicomViewport({
         {/* Phase 5 — overlay slice indicator. Bottom-center, mirrors the
             toast positioning but persistent (no fade) while in stack mode.
             Keeps the "where am I in the stack" feedback visible even when
-            the user is in fullscreen and the toolbar pill is hidden. */}
+            the user is in fullscreen and the toolbar pill is hidden.
+            Phase 6 — prefixed with paneLabel (L: / R:) when in
+            side-by-side-stack mode so the user can tell which pane is
+            scrolling without checking the toolbar above. */}
         {status === 'ready' && isStackMode && sliceCount > 1 && (
           <div style={sliceOverlayStyle} aria-hidden>
-            {formatSlicePos(sliceIdx, sliceCount)}
+            {paneLabel ? `${paneLabel}: ` : ''}{formatSlicePos(sliceIdx, sliceCount)}
           </div>
         )}
         {/* Ephemeral toast — keyed on toast.id so each new toast

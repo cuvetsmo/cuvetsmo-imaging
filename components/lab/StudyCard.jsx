@@ -4,6 +4,11 @@ import { studySummary, modalityToKey } from '../../lib/dicom/study-organizer';
 // AGENT-B Phase 5: lazy thumbnail load from IDB on mount, subscribe to
 // `cuvi:thumbnail-ready` so re-renders happen as the worker pool emits.
 import { loadThumbnail } from '../../lib/dicom/dicom-store';
+// AGENT-A Phase 6 — detect studies that will auto-route to side-by-side
+// synced compare so the CTA label can hint at the workflow up front.
+// LabHome's onOpenStudy callback already does the routing; this is just
+// for the button label.
+import { detectSyncCompareCandidate } from '../../lib/dicom/stack-scroll';
 
 // StudyCard — single-study panel in the imported-studies list.
 //
@@ -50,6 +55,19 @@ export default function StudyCard({
     }
     return max;
   }, [study]);
+  // AGENT-A Phase 6 — does this study auto-route to side-by-side-stack
+  // when the user clicks "Open"? Cached the same way (study identity)
+  // because the candidate detection traverses the series list.
+  const compareCandidate = useMemo(
+    () => detectSyncCompareCandidate(study),
+    [study],
+  );
+  const compareCounts = compareCandidate
+    ? {
+        left: compareCandidate.leftSeries.instances?.length || 0,
+        right: compareCandidate.rightSeries.instances?.length || 0,
+      }
+    : null;
   const titleId = useId();
 
   // AGENT-B Phase 5: thumbnail object URL. Null = not yet loaded /
@@ -205,18 +223,27 @@ export default function StudyCard({
           parent's onOpenStudy handler routes through to stack mode (one
           viewport, scrollable). The button label hints at this so the user
           knows what they're getting. The handler itself lives in LabHome's
-          onOpenStudy callback; we just expose the affordance here. */}
+          onOpenStudy callback; we just expose the affordance here.
+          AGENT-A Phase 6 — when the study has two series of similar
+          length (compareCandidate non-null), LabHome routes to synced
+          side-by-side compare instead. Reflect this in the label so the
+          user knows what they're getting BEFORE clicking — same handler,
+          richer hint. */}
       <button
         type="button"
         onClick={() => onOpenStudy?.(study)}
         style={openAllBtnStyle}
-        title={longestSeriesInstanceCount > 2
-          ? `Open as scrollable stack (${longestSeriesInstanceCount} slices)`
-          : 'Open study'}
+        title={compareCandidate
+          ? `Open synced compare: 2 series side-by-side (L: ${compareCounts.left} slices · R: ${compareCounts.right} slices)`
+          : longestSeriesInstanceCount > 2
+            ? `Open as scrollable stack (${longestSeriesInstanceCount} slices)`
+            : 'Open study'}
       >
-        {longestSeriesInstanceCount > 2
-          ? `📚 Open as stack (${longestSeriesInstanceCount} slices) →`
-          : 'Open study →'}
+        {compareCandidate
+          ? `🔗 Open synced compare (${compareCounts.left} ↔ ${compareCounts.right} slices) →`
+          : longestSeriesInstanceCount > 2
+            ? `📚 Open as stack (${longestSeriesInstanceCount} slices) →`
+            : 'Open study →'}
       </button>
     </section>
   );

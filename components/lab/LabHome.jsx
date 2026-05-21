@@ -16,7 +16,9 @@ import {
 // AGENT-A Phase 5 — stack-mode auto-router for multi-instance studies.
 // Routes Study → single / stack / side-by-side based on instance count so
 // scrolling a 200-slice CT works out of the box from "Open study".
-import { autoModeForFiles } from '../../lib/dicom/stack-scroll';
+// Phase 6 — detectSyncCompareCandidate identifies "2 series of similar
+// length" studies for the synced-compare workflow.
+import { autoModeForFiles, detectSyncCompareCandidate } from '../../lib/dicom/stack-scroll';
 // Agent 🅱 — worker pool that parses DICOM headers in parallel.
 import { parseDicomBatch } from '../../lib/dicom/parse-pool.ts';
 // Agent 🅲 — pure Study/Series grouping over a flat DicomFileMeta[].
@@ -65,14 +67,24 @@ function hasAnyDirectoryEntry(items) {
 
 export default function LabHome() {
   const isMobile = useMediaQuery('(max-width: 600px)');
-  // Side-by-side viewer state — unchanged. Capped at MAX_FILES (=2)
-  // because the grid layout only renders two panes.
+  // Phase 6 — viewport stacks panes vertically below this breakpoint
+  // (mobile-first). Synced compare on a 375 px phone reads better as
+  // two stacked rows than two squished columns.
+  const isNarrow = useMediaQuery('(max-width: 768px)');
+  // Side-by-side viewer state. For modes other than 'side-by-side-stack'
+  // this holds a flat File[] (legacy). For 'side-by-side-stack' it holds
+  // File[][] — one inner array per pane (Phase 6).
   const [files, setFiles] = useState([]);
   // AGENT-A Phase 5 — viewer mode. Decides whether the viewer surface
   // renders ONE pane with a scrollable stack, ONE pane with a single
-  // slice, or TWO panes side-by-side (legacy compare). Auto-derived by
+  // slice, TWO panes side-by-side (legacy compare), or — Phase 6 —
+  // TWO STACK panes side-by-side with synced scroll. Auto-derived by
   // file count when not explicitly set via `openInMode(files, mode)`.
   const [viewMode, setViewMode] = useState('single');
+  // Phase 6 — synced-compare toggle. Default ON when the user explicitly
+  // opens via the "compare 2 series" CTA; can be toggled off in the
+  // toolbar to scroll panes independently for differential reads.
+  const [syncCompareEnabled, setSyncCompareEnabled] = useState(true);
   const [error, setError] = useState(null);
   const [recent, setRecent] = useState([]);
 
@@ -113,10 +125,35 @@ export default function LabHome() {
   // viewer mode. If `mode` is omitted, autoModeForFiles picks: 1→single,
   // 2→side-by-side, 3+→stack. Declared HERE (above runBulkImport)
   // because runBulkImport's deps reference openInMode.
+  //
+  // Phase 6 — when `mode === 'side-by-side-stack'`, `nextFiles` must be
+  // a `File[][]` (array of arrays, one per pane). All other modes take
+  // a flat `File[]`. The shape is checked before we commit to state so a
+  // bad call doesn't leave the viewer in an unrecoverable mix.
   const openInMode = useCallback((nextFiles, mode) => {
     if (!nextFiles || nextFiles.length === 0) {
       setFiles([]);
       setViewMode('single');
+      return;
+    }
+    if (mode === 'side-by-side-stack') {
+      // Shape check — must be File[][]. If the caller passed File[] by
+      // mistake, fall back to plain 'stack' (single pane) so we don't
+      // render an empty grid.
+      const isPaneArray = Array.isArray(nextFiles)
+        && nextFiles.length >= 2
+        && Array.isArray(nextFiles[0])
+        && Array.isArray(nextFiles[1]);
+      if (!isPaneArray) {
+        setFiles(nextFiles);
+        setViewMode('stack');
+        return;
+      }
+      setFiles(nextFiles);
+      setViewMode('side-by-side-stack');
+      // Default sync ON for new compare sessions; the user can toggle off
+      // via the toolbar button.
+      setSyncCompareEnabled(true);
       return;
     }
     const resolved = mode || autoModeForFiles(nextFiles.length);
@@ -501,43 +538,113 @@ export default function LabHome() {
   }, []);
 
   const removeFileAt = useCallback((idx) => {
+    // Only valid in the LEGACY side-by-side (flat File[]) flow; in
+    // side-by-side-stack mode panes are removed via the parent "back to
+    // drop zone" button rather than per-pane ✕.
     setFiles((prev) => {
+      if (viewMode === 'side-by-side-stack') return prev; // no-op
       const next = prev.filter((_, i) => i !== idx);
-      // Dropping side-by-side back down to 1 file → switch to single mode
-      // so the remaining pane renders correctly. Stack mode can stay
-      // (you'd be removing the only slice, which goes back to empty).
       if (next.length === 1) setViewMode('single');
       else if (next.length === 0) setViewMode('single');
       return next;
     });
-  }, []);
+  }, [viewMode]);
 
-  const firstFile = files[0];
+  // Phase 6 — derive the "anchor" file for header summaries / fallback
+  // labels. In side-by-side-stack mode that's the first slice of the
+  // left pane; for all other modes it's the first element of the flat
+  // File[] (legacy behavior).
+  const isSideBySideStack = viewMode === 'side-by-side-stack';
+  const firstFile = isSideBySideStack
+    ? (Array.isArray(files[0]) ? files[0][0] : undefined)
+    : files[0];
 
   // ── VIEWER MODE ──
   //
-  // AGENT-A Phase 5 — three render branches:
-  //   stack        → ONE pane, all files passed as `files={...}` array,
-  //                  Cornerstone3D StackViewport scrolls through them.
-  //   side-by-side → N panes, each rendering one file in its own
-  //                  DicomViewport instance (legacy compare workflow).
-  //   single       → ONE pane, one file (legacy single-image workflow).
-  if (files.length > 0) {
-    const headerSummary = viewMode === 'stack' && files.length > 1
-      ? `Stack (${files.length} slices) · ${firstFile.name}…`
-      : files.length === 1
-        ? `${firstFile.name} — ${(firstFile.size / 1024).toFixed(0)} KB`
-        : `Study (${files.length} views): ${files.map(f => f.name).join(' + ')}`;
+  // AGENT-A Phase 5 / Phase 6 — four render branches:
+  //   stack               → ONE pane, all files passed as `files={...}`,
+  //                         Cornerstone3D StackViewport scrolls through all.
+  //   side-by-side        → N panes, each rendering ONE file (legacy compare).
+  //   side-by-side-stack  → TWO panes, each rendering ITS OWN stack of files,
+  //                         scroll synchronized via STACK_NEW_IMAGE event +
+  //                         proportional slice mapping. The Phase 6 addition.
+  //   single              → ONE pane, one file (legacy single-image workflow).
+  const hasContent = isSideBySideStack
+    ? (Array.isArray(files) && files.length >= 2 && Array.isArray(files[0]) && files[0].length > 0)
+    : files.length > 0;
+  if (hasContent) {
+    // Header label varies per mode. side-by-side-stack reports the total
+    // slice counts of L vs R because that's the at-a-glance question:
+    // "is the compare pair the same length?".
+    let headerSummary;
+    if (isSideBySideStack) {
+      const lCount = files[0]?.length || 0;
+      const rCount = files[1]?.length || 0;
+      headerSummary = `Synced compare · L (${lCount} slices) vs R (${rCount} slices)`;
+    } else if (viewMode === 'stack' && files.length > 1) {
+      headerSummary = `Stack (${files.length} slices) · ${firstFile.name}…`;
+    } else if (files.length === 1) {
+      headerSummary = `${firstFile.name} — ${(firstFile.size / 1024).toFixed(0)} KB`;
+    } else {
+      headerSummary = `Study (${files.length} views): ${files.map(f => f.name).join(' + ')}`;
+    }
     return (
       <div className="mx-auto max-w-7xl px-3 sm:px-5 py-4">
         <div className="flex justify-between items-center mb-3 gap-2 flex-wrap">
           <div className="text-sm text-[var(--color-text-muted)] font-mono">
             {headerSummary}
           </div>
-          <button onClick={reset} className="vmx-btn vmx-btn-ghost vmx-btn-sm">← Back to drop zone</button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {isSideBySideStack && (
+              <button
+                onClick={() => setSyncCompareEnabled((v) => !v)}
+                className="vmx-btn vmx-btn-sm"
+                title={syncCompareEnabled
+                  ? 'Sync ON — scroll one pane and the other follows. Click to disable.'
+                  : 'Sync OFF — panes scroll independently. Click to re-enable.'}
+                aria-pressed={syncCompareEnabled}
+                style={syncCompareEnabled ? syncToggleOnStyle : syncToggleOffStyle}
+              >
+                {syncCompareEnabled ? '🔗 Sync ON' : '⛓‍💥 Sync OFF'}
+              </button>
+            )}
+            <button onClick={reset} className="vmx-btn vmx-btn-ghost vmx-btn-sm">← Back to drop zone</button>
+          </div>
         </div>
 
-        {viewMode === 'stack' ? (
+        {isSideBySideStack ? (
+          // Phase 6 — TWO independent DicomViewport instances, each in
+          // its own stack mode, scrolling synced via window events.
+          // syncGroupId='compare' isolates the channel from any legacy
+          // 2-up that might be on the page (rare today, cheap to support).
+          //
+          // Each pane has paneLabel set so the slice indicator pill
+          // reads "L: 42 / 36" instead of just "📚 Slice 42 / 36" —
+          // visual disambiguation for the synced workflow.
+          //
+          // Mobile (<768px): grid collapses to one column so the panes
+          // stack vertically. Side-by-side at 375 px would be unreadable.
+          <div style={isNarrow ? compareGridMobileStyle : compareGridStyle}>
+            {[0, 1].map((paneIdx) => {
+              const paneFiles = files[paneIdx] || [];
+              if (paneFiles.length === 0) return null;
+              const label = paneIdx === 0 ? 'L' : 'R';
+              const anchor = paneFiles[0];
+              return (
+                <ViewerPane
+                  key={`compare-${paneIdx}-${anchor.name}-${anchor.size}-${paneFiles.length}`}
+                  files={paneFiles}
+                  mode="stack"
+                  index={paneIdx}
+                  canRemove={false}
+                  syncEnabled={syncCompareEnabled}
+                  syncGroupId="compare"
+                  paneLabel={label}
+                />
+              );
+            })}
+          </div>
+        ) : viewMode === 'stack' ? (
           // Single pane that owns the full stack — DicomViewport calls
           // viewport.setStack(allImageIds) and binds StackScrollTool.
           <ViewerPane
@@ -706,14 +813,37 @@ export default function LabHome() {
                   // series → side-by-side compare (legacy). Otherwise
                   // single-pane view of the first instance.
                   //
+                  // Phase 6 (Agent ⓐ) — BEFORE the legacy routing, check
+                  // for the synced-compare candidate (exactly two series
+                  // of similar length, each ≥3 instances). If so we route
+                  // to side-by-side-stack and skip the legacy fallback.
+                  // detectSyncCompareCandidate uses a 30% slice-count
+                  // tolerance so pre/post-contrast pairs (e.g. 36 vs 40
+                  // slices) qualify.
+                  if (!study?.series || study.series.length === 0) return;
+                  const pair = detectSyncCompareCandidate(study);
+                  if (pair) {
+                    const leftFiles = (pair.leftSeries.instances || [])
+                      .map((m) => m?.fileHandle)
+                      .filter(Boolean);
+                    const rightFiles = (pair.rightSeries.instances || [])
+                      .map((m) => m?.fileHandle)
+                      .filter(Boolean);
+                    if (leftFiles.length > 0 && rightFiles.length > 0) {
+                      openInMode([leftFiles, rightFiles], 'side-by-side-stack');
+                      return;
+                    }
+                    // Fall through to legacy path if file handles missing.
+                  }
+                  // Legacy Phase 5 routing — pick longest series for stack.
+                  //
                   // Why "largest series" not "total instances": a study
                   // with [series A: 200 slices, series B: 1 slice] should
                   // stack-mode series A (the volume), not flatten both
                   // into 201 mixed slices. We pick the longest series as
                   // the representative — series B can be opened via the
                   // per-instance row.
-                  const seriesList = study?.series || [];
-                  if (seriesList.length === 0) return;
+                  const seriesList = study.series;
                   let longestSeries = seriesList[0];
                   for (const s of seriesList) {
                     if ((s.instances?.length || 0) > (longestSeries.instances?.length || 0)) {
@@ -1044,15 +1174,35 @@ function ToolTile({ href, title, desc, meta, art }) {
 // (Tag inspector still views a single instance's DICOM tags — when scrolling
 // a stack the user would want to know "what tags does slice N have" which
 // is a future enhancement, not Phase 5 scope).
-function ViewerPane({ file, files, mode, index, canRemove, onRemove }) {
+//
+// Phase 6 — accepts syncEnabled + syncGroupId + paneLabel for the
+// side-by-side-stack workflow. paneLabel ('L'/'R') is also surfaced in
+// the pane header so the user can disambiguate before even looking at
+// the canvas. Defaults preserve Phase 5 behavior for non-compare callers.
+function ViewerPane({
+  file,
+  files,
+  mode,
+  index,
+  canRemove,
+  onRemove,
+  syncEnabled = false,
+  syncGroupId = 'default',
+  paneLabel = null,
+}) {
   const [showTags, setShowTags] = useState(false);
   const isStackPane = mode === 'stack' && Array.isArray(files) && files.length > 1;
   const primary = isStackPane ? files[0] : file;
+  const headerLabel = paneLabel
+    ? `Pane ${paneLabel}`
+    : isStackPane
+      ? 'Stack'
+      : `View ${index + 1}`;
   return (
     <div style={paneStyle}>
       <div style={paneHeaderStyle}>
         <span>
-          <strong>{isStackPane ? 'Stack' : `View ${index + 1}`}:</strong>{' '}
+          <strong>{headerLabel}:</strong>{' '}
           <span style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>
             {primary?.name}
             {isStackPane && (
@@ -1080,9 +1230,22 @@ function ViewerPane({ file, files, mode, index, canRemove, onRemove }) {
       </div>
       <Suspense fallback={<div style={loadingFallbackStyle}>กำลังโหลด viewer...</div>}>
         {isStackPane ? (
-          <DicomViewport files={files} mode="stack" caseId={null} syncEnabled={false} />
+          <DicomViewport
+            files={files}
+            mode="stack"
+            caseId={null}
+            syncEnabled={syncEnabled}
+            syncGroupId={syncGroupId}
+            paneLabel={paneLabel}
+          />
         ) : (
-          <DicomViewport file={primary} caseId={null} syncEnabled={false} />
+          <DicomViewport
+            file={primary}
+            caseId={null}
+            syncEnabled={syncEnabled}
+            syncGroupId={syncGroupId}
+            paneLabel={paneLabel}
+          />
         )}
       </Suspense>
       {showTags && (
@@ -1096,6 +1259,50 @@ function ViewerPane({ file, files, mode, index, canRemove, onRemove }) {
 
 const studyGridStyle = {
   display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 12,
+};
+// Phase 6 — Synced-compare grid. Two equal columns at ≥768px so the
+// L/R panes share the available width. The viewport canvas itself uses
+// `clamp(380px, calc(100vh - 260px), 900px)` for height, so the panes
+// stay readable on tall + short displays.
+const compareGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: 10,
+};
+// Mobile (<768px) — vertical stack instead of horizontal split. A 375 px
+// viewport split in half = 180 px wide per pane, which is unusable for
+// reading. Phone users get one pane on top of the other; sync still works
+// (and arguably reads better when one finger drives both).
+const compareGridMobileStyle = {
+  display: 'grid',
+  gridTemplateColumns: '1fr',
+  gap: 10,
+};
+// Toolbar Sync ON/OFF toggle. ON state uses the brand cyan ring (matches
+// the W/L preset active style elsewhere); OFF is a quiet bordered button.
+const syncToggleOnStyle = {
+  minHeight: 32,
+  padding: '5px 12px',
+  background: 'rgba(6,182,212,0.10)',
+  color: '#0e7490',
+  border: '1px solid rgba(6,182,212,0.45)',
+  borderRadius: 4,
+  fontSize: '0.78rem',
+  fontWeight: 600,
+  letterSpacing: 0.2,
+  cursor: 'pointer',
+  boxShadow: '0 0 0 2px rgba(6,182,212,0.25)',
+};
+const syncToggleOffStyle = {
+  minHeight: 32,
+  padding: '5px 12px',
+  background: 'transparent',
+  color: 'var(--color-text-muted)',
+  border: '1px solid var(--color-border)',
+  borderRadius: 4,
+  fontSize: '0.78rem',
+  fontWeight: 500,
+  cursor: 'pointer',
 };
 const paneStyle = {
   border: '1px solid var(--color-border)',

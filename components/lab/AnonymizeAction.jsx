@@ -43,6 +43,12 @@ export default function AnonymizeAction({ study }) {
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [result, setResult] = useState(null); // { report, packed } | null
   const [errorMsg, setErrorMsg] = useState('');
+  // Phase 6 (Agent Ⓒ): per-confirmation flag. Default true — manufacturer
+  // private blocks are a common PHI hiding spot (DeviceSerialNumber, scan
+  // operator notes, dose-report comments). Students can opt out from the
+  // confirm row if they need to keep private blocks for a specific
+  // research-data study.
+  const [stripPrivateBlocks, setStripPrivateBlocks] = useState(true);
   const armTimerRef = useRef(null);
   const resetTimerRef = useRef(null);
   const triggerBtnRef = useRef(null);
@@ -81,6 +87,11 @@ export default function AnonymizeAction({ study }) {
         // Defaults match the brief: keep StudyDescription + SeriesDescription
         keepStudyDescription: true,
         keepSeriesDescription: true,
+        // Phase 6 (Agent Ⓒ): private blocks + recursive sequence walk.
+        // Sequences default ON (cheap + critical for SR/dose PHI). Private-
+        // block strip mirrors the UI checkbox state.
+        stripPrivateBlocks,
+        walkSequences: true,
       }, (info) => {
         setProgress({ done: info.doneFiles, total: info.totalFiles });
       });
@@ -107,7 +118,7 @@ export default function AnonymizeAction({ study }) {
       setErrorMsg(err instanceof Error ? err.message : String(err));
       setPhase('error');
     }
-  }, [study.studyUid]);
+  }, [study.studyUid, stripPrivateBlocks]);
 
   // ── Render ─────────────────────────────────────────────────────────
 
@@ -135,6 +146,21 @@ export default function AnonymizeAction({ study }) {
           <span id={labelId} style={confirmTextStyle}>
             Strip PII & build ZIP?
           </span>
+          {/* Phase 6 (Agent Ⓒ) option toggle — default checked. Keeps the
+              destructive-action choice in one row so keyboard users can
+              tab through cleanly. */}
+          <label style={checkboxLabelStyle}>
+            <input
+              type="checkbox"
+              checked={stripPrivateBlocks}
+              onChange={(e) => setStripPrivateBlocks(e.target.checked)}
+              style={checkboxInputStyle}
+            />
+            <span>Strip private blocks</span>
+            <span style={checkboxHintStyle} aria-hidden>
+              (manufacturer tags · recommended)
+            </span>
+          </label>
           <button
             type="button"
             onClick={handleConfirm}
@@ -291,6 +317,29 @@ const ghostBtnStyle = {
   fontSize: '0.74rem',
   cursor: 'pointer',
   minHeight: 32,
+};
+
+const checkboxLabelStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  fontSize: '0.74rem',
+  color: 'var(--color-text-muted)',
+  fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+  cursor: 'pointer',
+  userSelect: 'none',
+};
+
+const checkboxInputStyle = {
+  margin: 0,
+  cursor: 'pointer',
+  accentColor: '#5FDDA8',
+};
+
+const checkboxHintStyle = {
+  color: 'var(--color-text-muted)',
+  opacity: 0.7,
+  fontSize: '0.7rem',
 };
 
 const progressRowStyle = {

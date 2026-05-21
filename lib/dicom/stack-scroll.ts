@@ -124,17 +124,90 @@ export function sliceDeltaFromTouch(travelPx: number): number {
  * Resolve the auto-mode for a list of files. Used by LabHome to route a
  * `onOpenStudy(study)` callback through to the right viewer state:
  *
- *   - 0 files          → 'single' (caller should refuse anyway)
- *   - 1 file           → 'single'
- *   - 2 files          → 'side-by-side' (legacy behavior, two panes)
- *   - 3+ files         → 'stack' (one StackViewport, scroll through all)
+ *   - 0 files                  → 'single' (caller should refuse anyway)
+ *   - 1 file                   → 'single'
+ *   - 2 files                  → 'side-by-side' (legacy behavior, two panes)
+ *   - 3+ files                 → 'stack' (one StackViewport, scroll through all)
+ *
+ * `side-by-side-stack` is NOT auto-routed by file count — it requires the
+ * caller to opt in explicitly (typically because the study has two real
+ * series that the user wants to scroll synchronously). See
+ * `detectSyncCompareCandidate` for the study-shape check.
  *
  * Mode is a hint; DicomViewport accepts it as a prop and the caller can
  * override (e.g. force side-by-side for a user-chosen multi-pane compare).
  */
-export type ViewerMode = 'single' | 'stack' | 'side-by-side';
+export type ViewerMode = 'single' | 'stack' | 'side-by-side' | 'side-by-side-stack';
 export function autoModeForFiles(count: number): ViewerMode {
   if (count <= 1) return 'single';
   if (count === 2) return 'side-by-side';
   return 'stack';
+}
+
+/**
+ * Map a slice index from one stack length to another. Used by the
+ * side-by-side-stack sync wire so a 36-slice ↔ 40-slice pair can still
+ * scroll together — left pane at slice 18/36 maps to right pane at
+ * slice 20/40 (same fractional position through the volume).
+ *
+ * For equal counts this is the identity. For zero / negative totals it
+ * returns 0 (defensive — the caller should have bailed already).
+ */
+export function proportionalSliceIndex(
+  srcIdx: number,
+  srcTotal: number,
+  destTotal: number,
+): number {
+  if (destTotal <= 0) return 0;
+  if (srcTotal <= 0) return 0;
+  if (srcTotal === destTotal) return clampIndex(srcIdx, destTotal);
+  // Use the midpoint of the source slice's "bucket" so 0→0 and last→last
+  // stay anchored exactly, with proportional spread in between.
+  const frac = (srcIdx + 0.5) / srcTotal;
+  return clampIndex(Math.floor(frac * destTotal), destTotal);
+}
+
+/**
+ * Detect whether a Study is a good candidate for the sync-compare workflow.
+ * Returns `{ leftSeries, rightSeries }` (the two longest series of the
+ * study, in declared order) when the study has at least 2 series with each
+ * having 3+ instances AND the slice counts are within a 30% tolerance of
+ * each other (so we don't try to "compare" a 200-slice CT against a single
+ * scout view).
+ *
+ * The 30% tolerance is generous on purpose — real-world matched-pair CTs
+ * (pre-/post-contrast on the same patient) drift by a slice or two due to
+ * breath-hold differences, so a strict equality check would miss valid
+ * pairs. Tightening this later is cheap if false-positives bite.
+ *
+ * Returns `null` when no valid pair exists. The caller (LabHome) uses this
+ * to decide whether to expose the "🔗 Compare 2 series" CTA.
+ */
+export interface SyncCompareCandidate<S> {
+  leftSeries: S;
+  rightSeries: S;
+}
+
+export function detectSyncCompareCandidate<S extends { instances?: unknown[] }>(
+  study: { series?: S[] } | null | undefined,
+): SyncCompareCandidate<S> | null {
+  const list = study?.series || [];
+  // Need 2+ series of >2 instances each.
+  const eligible = list.filter((s) => (s.instances?.length || 0) >= 3);
+  if (eligible.length < 2) return null;
+  // Take the two LONGEST series (descending by instance count, stable
+  // tie-break via original index). Avoids picking a 3-slice scout when a
+  // 4th meaningful series exists.
+  const sorted = [...eligible].sort(
+    (a, b) => (b.instances?.length || 0) - (a.instances?.length || 0),
+  );
+  const left = sorted[0];
+  const right = sorted[1];
+  const lCount = left.instances?.length || 0;
+  const rCount = right.instances?.length || 0;
+  if (lCount === 0 || rCount === 0) return null;
+  // Tolerance: |Δ| / max <= 0.30. Symmetric so order doesn't matter.
+  const ratio = Math.abs(lCount - rCount) / Math.max(lCount, rCount);
+  if (ratio > 0.30) return null;
+  return { leftSeries: left, rightSeries: right };
 }

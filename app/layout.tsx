@@ -3,6 +3,7 @@ import { IBM_Plex_Sans_Thai, Inter } from "next/font/google";
 import "./globals.css";
 import { SiteHeader, SiteFooter } from "@/components/Brand";
 import { EcosystemBar } from "@/components/EcosystemBar";
+import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
 
 const ibmPlexSansThai = IBM_Plex_Sans_Thai({
   variable: "--font-ibm-plex-sans-thai",
@@ -51,6 +52,12 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-touch-icon.png",
   },
+  // Phase 6: PWA manifest declares us a share_target so Android Chrome /
+  // Edge can route shared DICOM files to /share-receiver. See
+  // public/manifest.json + public/sw.js + app/share-receiver/. iOS Safari
+  // does not implement share_target as of 2026-05 — the receiver page
+  // handles that gracefully.
+  manifest: "/manifest.json",
   openGraph: {
     title: "CUVETSMO Imaging — DICOM viewer + AI overlays for vet students",
     description:
@@ -140,6 +147,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-[var(--color-bg)] text-[var(--color-text)]">
+        <ServiceWorkerRegistrar />
         <EcosystemBar current="imaging" />
         <SiteHeader />
         <main className="flex-1 w-full">{children}</main>
