@@ -48,3 +48,8 @@ next-env.d.ts
 
 # local audit-log scratch from agent work — never commit
 _tmp/
+
+# Phase 8 — test artifacts
+/playwright-report/
+/test-results/
+/.vitest-cache

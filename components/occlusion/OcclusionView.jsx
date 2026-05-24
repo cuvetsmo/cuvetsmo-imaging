@@ -162,6 +162,13 @@ export default function OcclusionView() {
       setToast('ไฟล์ไม่ใช่รูป');
       return;
     }
+    // Phase 8 security: drag-drop bypasses <input accept>, so re-check
+    // here. SVG can embed <script>/<foreignObject>; raster-only is safe
+    // bytes-not-code. Mirrors the accept attribute on the file input.
+    if (file.type === 'image/svg+xml' || /\.svg$/i.test(file.name)) {
+      setToast('SVG ไม่รองรับ — ใช้ PNG / JPG / WebP เท่านั้น');
+      return;
+    }
     setEditing({ _bootstrapFile: file });
   }, []);
 
@@ -277,8 +284,11 @@ export default function OcclusionView() {
             <input
               id="occlusion-bootstrap-file"
               type="file"
-              accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
-              aria-label="อัปโหลดรูปเพื่อสร้าง image occlusion deck — รองรับ PNG, JPG, WebP, SVG"
+              // Phase 8 security: SVG removed from accept list. SVG can carry
+              // <script> + foreignObject HTML, so user-supplied SVG = XSS
+              // surface. Raster-only inputs are bytes-not-code, safe.
+              accept="image/png,image/jpeg,image/jpg,image/webp"
+              aria-label="อัปโหลดรูปเพื่อสร้าง image occlusion deck — รองรับ PNG, JPG, WebP"
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) onDropFile(f);
@@ -300,7 +310,7 @@ export default function OcclusionView() {
               📷 สร้าง deck แรก
             </div>
             <div style={{ fontSize: 14, marginBottom: 12 }}>
-              คลิกที่นี่ หรือ ลากรูปมาวาง · รองรับ PNG / JPG / WebP / SVG
+              คลิกที่นี่ หรือ ลากรูปมาวาง · รองรับ PNG / JPG / WebP
             </div>
             <div style={{ fontSize: 12, color: 'var(--clr-ink-soft)' }}>
               เหมาะกับ anatomy lateral · radiograph · histology · microbe colony plate

@@ -39,7 +39,24 @@ function refRangeForSpecies(species) {
   return null;
 }
 
-export default function VHSOverlay({ active, viewportRef, caseId = null, species = '', groundTruth = null }) {
+// Phase 8 (Agent ③) — per-slice anchoring (mirror of NorbergOverlay).
+//
+// Measurement schema:
+//   { sliceIndex: number|null, points: world[] }
+//     sliceIndex = null   → single mode (radiograph, always visible)
+//     sliceIndex = N      → stack mode (CT slice N · only visible when scrolled to N)
+//
+// Backward compat: existing localStorage saves remain valid in single mode.
+export default function VHSOverlay({
+  active,
+  viewportRef,
+  caseId = null,
+  species = '',
+  groundTruth = null,
+  currentSliceIndex = 0,
+  isStackMode = false,
+  onJumpToSlice = null,
+}) {
   const isMobile = useMediaQuery('(max-width: 600px)');
   const ref = refRangeForSpecies(species);
   // Auto-look-up expert VHS from CASES by caseId when the parent
@@ -56,8 +73,49 @@ export default function VHSOverlay({ active, viewportRef, caseId = null, species
     return { vhs: gt.value, source: gt.source };
   }, [groundTruth, caseId]);
   const [cardCollapsed, setCardCollapsed] = useState(false);
-  const [worldPoints, setWorldPoints] = useState([]);
+  // Phase 8 — measurements list (one per slice in stack mode).
+  const [measurements, setMeasurements] = useState([]);
   const [, setTick] = useState(0);
+
+  // Active measurement = the one anchored to the current slice (or the
+  // single-mode entry).
+  const activeAnchor = isStackMode ? currentSliceIndex : null;
+  const activeMeasurement = useMemo(() => {
+    return measurements.find((m) => m.sliceIndex === activeAnchor) || null;
+  }, [measurements, activeAnchor]);
+  // Wrap in useMemo so the empty-array fallback doesn't change identity
+  // every render (otherwise downstream hook dep arrays see worldPoints
+  // as "new" each render → exhaustive-deps lint warns).
+  const EMPTY_POINTS = useMemo(() => [], []);
+  const worldPoints = activeMeasurement?.points || EMPTY_POINTS;
+
+  const otherSliceMeasurements = useMemo(() => {
+    if (!isStackMode) return [];
+    return measurements.filter(
+      (m) => m.sliceIndex !== activeAnchor && m.points.length > 0
+    );
+  }, [measurements, activeAnchor, isStackMode]);
+
+  // Lazy-create the active measurement entry on first interaction.
+  // Empties (mutator returns []) drop the entry entirely so the
+  // other-slice count stays honest.
+  const updateActivePoints = useCallback((mutator) => {
+    setMeasurements((prev) => {
+      const idx = prev.findIndex((m) => m.sliceIndex === activeAnchor);
+      if (idx === -1) {
+        const startingPoints = mutator([]);
+        if (startingPoints.length === 0) return prev;
+        return [...prev, { sliceIndex: activeAnchor, points: startingPoints }];
+      }
+      const nextPoints = mutator(prev[idx].points);
+      if (nextPoints.length === 0) {
+        return prev.filter((_, i) => i !== idx);
+      }
+      return prev.map((m, i) =>
+        i === idx ? { ...m, points: nextPoints } : m
+      );
+    });
+  }, [activeAnchor]);
 
   useEffect(() => {
     if (!active || worldPoints.length === 0) return;
@@ -65,22 +123,23 @@ export default function VHSOverlay({ active, viewportRef, caseId = null, species
     return () => clearInterval(id);
   }, [active, worldPoints.length]);
 
+  // Phase 8: clears ALL slices' measurements.
   useEffect(() => {
-    const onClear = () => setWorldPoints([]);
+    const onClear = () => setMeasurements([]);
     window.addEventListener('vmx-lab-clear-overlays', onClear);
     return () => window.removeEventListener('vmx-lab-clear-overlays', onClear);
   }, []);
 
   useEffect(() => {
     if (!active) return;
-    const onUndo = () => setWorldPoints((prev) => prev.slice(0, -1));
+    const onUndo = () => updateActivePoints((prev) => prev.slice(0, -1));
     window.addEventListener('vmx-lab-undo-point', onUndo);
     return () => window.removeEventListener('vmx-lab-undo-point', onUndo);
-  }, [active]);
+  }, [active, updateActivePoints]);
 
   const undo = useCallback(() => {
-    setWorldPoints((prev) => prev.slice(0, -1));
-  }, []);
+    updateActivePoints((prev) => prev.slice(0, -1));
+  }, [updateActivePoints]);
 
   const exportStateJson = useCallback(() => {
     if (worldPoints.length < 6) return;
@@ -95,6 +154,7 @@ export default function VHSOverlay({ active, viewportRef, caseId = null, species
       version: 1,
       model: 'manual-vhs',
       created_at: new Date().toISOString(),
+      slice_index: activeAnchor, // Phase 8 — record slice anchor
       predictions: {
         vhs: {
           points: {
@@ -118,7 +178,7 @@ export default function VHSOverlay({ active, viewportRef, caseId = null, species
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  }, [worldPoints]);
+  }, [worldPoints, activeAnchor]);
 
   const screenPoints = useMemo(() => {
     const vp = viewportRef?.();
@@ -131,7 +191,6 @@ export default function VHSOverlay({ active, viewportRef, caseId = null, species
         return { x: -100, y: -100 };
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [worldPoints, viewportRef]);
 
   const HIT_RADIUS_PX = 16;
@@ -163,12 +222,11 @@ export default function VHSOverlay({ active, viewportRef, caseId = null, species
     if (worldPoints.length >= 6) return;
     try {
       const world = vp.canvasToWorld([cx, cy]);
-      setWorldPoints((prev) => [...prev, world]);
+      updateActivePoints((prev) => [...prev, world]);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('[VHSOverlay] canvasToWorld error:', err);
     }
-  }, [active, worldPoints, viewportRef]);
+  }, [active, worldPoints, viewportRef, updateActivePoints]);
 
   useEffect(() => {
     if (draggingIdx == null) return;
@@ -182,7 +240,7 @@ export default function VHSOverlay({ active, viewportRef, caseId = null, species
       const cy = e.clientY - rect.top;
       try {
         const world = vp.canvasToWorld([cx, cy]);
-        setWorldPoints((prev) => prev.map((p, i) => (i === draggingIdx ? world : p)));
+        updateActivePoints((prev) => prev.map((p, i) => (i === draggingIdx ? world : p)));
       } catch { /* canvasToWorld failed */ }
     };
     const onUp = () => {
@@ -197,11 +255,13 @@ export default function VHSOverlay({ active, viewportRef, caseId = null, species
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
     };
-  }, [draggingIdx, viewportRef]);
+  }, [draggingIdx, viewportRef, updateActivePoints]);
 
   const [confirmingReset, setConfirmingReset] = useState(false);
+  // Phase 8: Reset wipes ALL slices' measurements (matches existing
+  // "Reset" expectation).
   const reset = useCallback(() => {
-    setWorldPoints((prev) => {
+    setMeasurements((prev) => {
       if (prev.length === 0) return prev;
       if (!confirmingReset) {
         setConfirmingReset(true);
@@ -225,12 +285,14 @@ export default function VHSOverlay({ active, viewportRef, caseId = null, species
     setSaveState({ status: 'saving', msg: null });
     // Standalone build — no Supabase backend wired Day 1. Persist to
     // localStorage so attempts survive page reload + export via JSON button.
+    // Phase 8 — slice_index recorded for stack-mode replay.
     try {
       const key = 'cuvi-vhs-attempts';
       const prev = JSON.parse(localStorage.getItem(key) || '[]');
       prev.push({
         ts: new Date().toISOString(),
         caseId: caseId || null,
+        sliceIndex: activeAnchor,
         worldPoints, Lv, Sv, vhs,
       });
       localStorage.setItem(key, JSON.stringify(prev.slice(-200)));
@@ -239,7 +301,7 @@ export default function VHSOverlay({ active, viewportRef, caseId = null, species
     } catch (e) {
       setSaveState({ status: 'error', msg: `บันทึก local ไม่สำเร็จ: ${e?.message || e}` });
     }
-  }, [worldPoints, caseId]);
+  }, [worldPoints, caseId, activeAnchor]);
 
   const result = useMemo(() => {
     if (worldPoints.length < 6) return null;
@@ -265,6 +327,17 @@ export default function VHSOverlay({ active, viewportRef, caseId = null, species
   if (!active) return null;
 
   const nextLabel = STEPS[worldPoints.length];
+
+  // Phase 8 — jump to first other-slice measurement.
+  const jumpToOtherSlice = () => {
+    if (!onJumpToSlice || otherSliceMeasurements.length === 0) return;
+    const sorted = [...otherSliceMeasurements]
+      .map((m) => m.sliceIndex)
+      .filter((i) => typeof i === 'number')
+      .sort((a, b) => a - b);
+    if (sorted.length === 0) return;
+    onJumpToSlice(sorted[0]);
+  };
 
   return (
     <div
@@ -327,6 +400,34 @@ export default function VHSOverlay({ active, viewportRef, caseId = null, species
           : '📐 VHS — ครบ 6 จุด ลากจุดเพื่อปรับ ดูผลด้านล่าง'}
       </div>
 
+      {/* Phase 8 — other-slice badge. */}
+      {isStackMode && otherSliceMeasurements.length > 0 && (
+        <div
+          style={otherSliceBadgeStyle}
+          role={onJumpToSlice ? 'button' : 'note'}
+          tabIndex={onJumpToSlice ? 0 : -1}
+          onClick={onJumpToSlice ? jumpToOtherSlice : undefined}
+          onKeyDown={onJumpToSlice ? (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              jumpToOtherSlice();
+            }
+          } : undefined}
+          aria-label={
+            `VHS measurements exist on ${otherSliceMeasurements.length} other ${otherSliceMeasurements.length === 1 ? 'slice' : 'slices'}: ${otherSliceMeasurements.map((m) => m.sliceIndex + 1).join(', ')}` +
+            (onJumpToSlice ? ' · activate to jump' : '')
+          }
+        >
+          📐 VHS on {otherSliceMeasurements.length} other{' '}
+          {otherSliceMeasurements.length === 1 ? 'slice' : 'slices'}
+          {onJumpToSlice && (
+            <span style={{ opacity: 0.7, marginLeft: 6, fontSize: '0.78em' }}>
+              → click to jump
+            </span>
+          )}
+        </div>
+      )}
+
       {result && (
         <div style={isMobile ? (cardCollapsed ? mobileSheetCollapsedStyle : mobileSheetStyle) : resultCardStyle}>
           <div
@@ -343,6 +444,11 @@ export default function VHSOverlay({ active, viewportRef, caseId = null, species
           >
             <span>
               Vertebral Heart Score
+              {isStackMode && (
+                <span style={{ marginLeft: 6, fontWeight: 400, opacity: 0.7, fontSize: '0.78em' }}>
+                  (slice {currentSliceIndex + 1})
+                </span>
+              )}
               {isMobile && cardCollapsed && (
                 <span style={{ marginLeft: 8, fontWeight: 400, opacity: 0.8, fontSize: '0.82em', color: '#ffd93d' }}>
                   VHS = {result.vhs.toFixed(2)} v
@@ -423,7 +529,13 @@ export default function VHSOverlay({ active, viewportRef, caseId = null, species
             <button
               onClick={reset}
               style={{ ...resetBtnStyle, background: confirmingReset ? '#b85450' : '#444' }}
-              title={confirmingReset ? 'คลิกอีกครั้งใน 3 วินาทีเพื่อยืนยันลบทั้งหมด' : 'ลบ VHS points ทั้งหมด'}
+              title={
+                confirmingReset
+                  ? 'คลิกอีกครั้งใน 3 วินาทีเพื่อยืนยันลบทั้งหมด'
+                  : (isStackMode
+                      ? `ลบ VHS points ทุก slice (${measurements.length} measurement${measurements.length === 1 ? '' : 's'})`
+                      : 'ลบ VHS points ทั้งหมด')
+              }
             >
               {confirmingReset ? '⚠️ ยืนยัน Reset?' : '↺ Reset'}
             </button>
@@ -468,6 +580,21 @@ const topBannerStyle = {
   fontSize: '0.85rem',
   pointerEvents: 'none',
   zIndex: 1,
+};
+
+// Phase 8 — "you have measurements on other slices" badge.
+const otherSliceBadgeStyle = {
+  position: 'absolute',
+  top: 44, left: 8,
+  background: 'rgba(74, 107, 138, 0.92)',
+  color: '#fff',
+  padding: '4px 10px',
+  borderRadius: 4,
+  fontSize: '0.76rem',
+  pointerEvents: 'auto',
+  cursor: 'pointer',
+  zIndex: 2,
+  border: '1px solid rgba(255,255,255,0.2)',
 };
 
 const resultCardStyle = {

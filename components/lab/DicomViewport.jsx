@@ -111,6 +111,16 @@ export default function DicomViewport({
   // pill so the user can tell at a glance which pane is which in
   // side-by-side-stack mode. Null hides the prefix (single pane / legacy).
   paneLabel = null,
+  // AGENT-④ Phase 8 — per-axis sync toggles. Phase 6 used a single
+  // `syncEnabled` boolean for slice + camera together; Phase 8 splits it
+  // into independent axes so users can opt into W/L sync without losing
+  // the slice/camera default. `syncEnabled` is preserved as a coarse
+  // master gate (false = nothing syncs, regardless of per-axis flags) so
+  // legacy callers and the "off" path are untouched. Defaults match Phase
+  // 6 behavior (slice + camera ON, W/L OFF) for non-compare callers.
+  syncSlice = true,
+  syncCamera = true,
+  syncWL = false,
 }) {
   // Back-compat normalization. The legacy callsite passed `file: File`; the
   // Phase 5 callsite passes `files: File[]` + `mode`. Convert single → array
@@ -148,6 +158,16 @@ export default function DicomViewport({
   // before that effect runs. See the longer note at the (former)
   // declaration site for full intent.
   const isApplyingPresetRef = useRef(false);
+  // AGENT-④ Phase 8 — pending preset id for the W/L sync dispatcher.
+  // applyPreset/resetView/initial-auto set this immediately before
+  // calling viewport.setProperties so the synchronous VOI_MODIFIED that
+  // bounces back can be tagged with the right preset id (without this,
+  // onLocalVoi would read `activePreset` from closure, which is the
+  // PREVIOUS preset because setActivePreset schedules an async update).
+  // Null when the source of the next VOI write is a user drag (the W/L
+  // sync dispatcher checks `isApplyingPresetRef.current` first — if
+  // false, presetId is forced to null regardless of this ref).
+  const pendingPresetIdRef = useRef(null);
   const [status, setStatus] = useState('init');
   const [errorMsg, setErrorMsg] = useState('');
   const [meta, setMeta] = useState(null);
@@ -261,6 +281,10 @@ export default function DicomViewport({
         requestAnimationFrame(() => {
           if (cancelled) return;
           isApplyingPresetRef.current = true;
+          // AGENT-④ Phase 8 — tag the impending VOI_MODIFIED bounce
+          // with the preset id so the W/L sync dispatcher can mirror
+          // the cyan ring on the twin pane (when sync is on).
+          pendingPresetIdRef.current = 'auto';
           try {
             const ok = applySmartContrast(viewport);
             // Mark Auto as the initial active preset only if it
@@ -268,7 +292,10 @@ export default function DicomViewport({
             // wins and no preset is "active".
             if (ok) setActivePreset('auto');
           } finally {
-            queueMicrotask(() => { isApplyingPresetRef.current = false; });
+            queueMicrotask(() => {
+              isApplyingPresetRef.current = false;
+              pendingPresetIdRef.current = null;
+            });
           }
         });
 
@@ -398,6 +425,12 @@ export default function DicomViewport({
     // just set. Microtask-reset because setProperties fires the event
     // synchronously inside the same task.
     isApplyingPresetRef.current = true;
+    // AGENT-④ Phase 8 — tag the impending VOI_MODIFIED bounce with
+    // the preset id so the W/L sync dispatcher can mirror the cyan
+    // ring on the twin pane (when sync is on). Even reset rings the
+    // toast / clears the local preset so the dispatcher fires a null
+    // mirror — we use the preset.id for both regular + reset cases.
+    pendingPresetIdRef.current = preset.id;
     try {
       if (preset.isReset) {
         viewport.resetProperties();
@@ -421,7 +454,10 @@ export default function DicomViewport({
       setActivePreset(preset.id);
       showToast(formatPresetToast(preset));
     } finally {
-      queueMicrotask(() => { isApplyingPresetRef.current = false; });
+      queueMicrotask(() => {
+        isApplyingPresetRef.current = false;
+        pendingPresetIdRef.current = null;
+      });
     }
   }, [showToast]);
 
@@ -455,6 +491,10 @@ export default function DicomViewport({
     // but route through the flag so the drift handler doesn't double-
     // null an already-null state on the same event.
     isApplyingPresetRef.current = true;
+    // AGENT-④ Phase 8 — reset clears the ring (no preset active) so we
+    // tag the W/L sync bounce with null. The receiver will mirror by
+    // also clearing its own ring + applying the reset's voiRange.
+    pendingPresetIdRef.current = null;
     try {
       viewport.resetCamera();
       viewport.resetProperties();
@@ -577,8 +617,19 @@ export default function DicomViewport({
   // could coexist on the page. The detail payload carries `totalSlices`
   // so the receiver can map proportionally when stack lengths differ
   // (e.g. compare a 36-slice C-spine to a 40-slice repeat).
+  //
+  // AGENT-④ Phase 8 — slice + camera now gated INDEPENDENTLY via the
+  // per-axis `syncSlice` / `syncCamera` props (defaults preserve Phase 6
+  // behavior). `syncEnabled` stays the master gate; a per-axis flag of
+  // false just means the corresponding listener pair is not attached, so
+  // events from the twin pane on that axis are ignored on this side AND
+  // we don't dispatch our own. Both directions are necessary — otherwise
+  // a one-sided opt-out would still receive incoming updates on the off
+  // axis. (W/L sync lives in its own effect just below — separate `isApplying`
+  // closure so it can't gate slice/camera bounces and vice-versa.)
   useEffect(() => {
     if (!syncEnabled || status !== 'ready') return;
+    if (!syncSlice && !syncCamera) return; // nothing to attach
     const element = elRef.current;
     if (!element) return;
     const myId = viewportIdRef.current;
@@ -684,17 +735,157 @@ export default function DicomViewport({
       }
     };
 
-    element.addEventListener(Enums.Events.CAMERA_MODIFIED, onCameraChange);
-    window.addEventListener(cameraEvent, onRemoteCamera);
-    element.addEventListener(Enums.Events.STACK_NEW_IMAGE, onLocalNewImage);
-    window.addEventListener(sliceEvent, onRemoteSlice);
+    if (syncCamera) {
+      element.addEventListener(Enums.Events.CAMERA_MODIFIED, onCameraChange);
+      window.addEventListener(cameraEvent, onRemoteCamera);
+    }
+    if (syncSlice) {
+      element.addEventListener(Enums.Events.STACK_NEW_IMAGE, onLocalNewImage);
+      window.addEventListener(sliceEvent, onRemoteSlice);
+    }
     return () => {
-      element.removeEventListener(Enums.Events.CAMERA_MODIFIED, onCameraChange);
-      window.removeEventListener(cameraEvent, onRemoteCamera);
-      element.removeEventListener(Enums.Events.STACK_NEW_IMAGE, onLocalNewImage);
-      window.removeEventListener(sliceEvent, onRemoteSlice);
+      if (syncCamera) {
+        element.removeEventListener(Enums.Events.CAMERA_MODIFIED, onCameraChange);
+        window.removeEventListener(cameraEvent, onRemoteCamera);
+      }
+      if (syncSlice) {
+        element.removeEventListener(Enums.Events.STACK_NEW_IMAGE, onLocalNewImage);
+        window.removeEventListener(sliceEvent, onRemoteSlice);
+      }
     };
-  }, [syncEnabled, status, syncGroupId, isStackMode, sliceCount]);
+  }, [syncEnabled, syncSlice, syncCamera, status, syncGroupId, isStackMode, sliceCount]);
+
+  // AGENT-④ Phase 8 — W/L cross-pane sync (default OFF · opt-in).
+  //
+  // Mirrors the Phase 6 slice + camera pattern: subscribe to the local
+  // VOI_MODIFIED event, dispatch a window event with the new voiRange so
+  // the twin pane can apply the same lower/upper bounds via
+  // `viewport.setProperties({ voiRange })`.
+  //
+  // Design notes:
+  //   • Default OFF — clinicians often want different W/L per pane
+  //     (bone left vs lung right on a normal-vs-cardiomegaly compare).
+  //     The toggle in LabHome's chrome popover is the opt-in surface.
+  //   • Separate `isApplyingWL` closure flag — DO NOT reuse the
+  //     slice/camera flags. Each axis bounces independently on its own
+  //     event; mixing the flags would let a slice change accidentally
+  //     gate the next W/L drag (or vice-versa).
+  //   • Coexists with Phase 5's `isApplyingPresetRef` — that ref gates
+  //     the cyan-ring drift-clear for our OWN programmatic writes. When
+  //     a remote VOI lands here, we set the preset ref true around the
+  //     setProperties call so the remote's preset (if any) survives the
+  //     local VOI_MODIFIED bounce instead of being cleared.
+  //   • Detail payload includes an optional `presetId` — when the
+  //     source pane just applied a preset, we propagate the id so the
+  //     receiver can mirror the cyan ring (otherwise the receiver would
+  //     get the right voiRange but show no active preset, which would
+  //     visually lie). When the source is a user drag, presetId is null
+  //     and the receiver's ring stays cleared/unchanged.
+  useEffect(() => {
+    if (!syncEnabled || !syncWL || status !== 'ready') return;
+    const element = elRef.current;
+    if (!element) return;
+    const myId = viewportIdRef.current;
+    let isApplyingWL = false;
+    const wlEvent = syncGroupId === 'default'
+      ? 'vmx-lab-sync-wl'
+      : `vmx-lab-sync-wl:${syncGroupId}`;
+
+    const onLocalVoi = (evt) => {
+      // Our own programmatic apply just below — bounce expected, skip.
+      if (isApplyingWL) return;
+      // Phase 5's preset/reset gate — when WE applied a preset locally,
+      // its synchronous VOI_MODIFIED bounce comes through here too. We
+      // STILL want to propagate that preset to the twin (the spec says
+      // "preset on left → right gets same preset" when sync ON). The
+      // preset-ref is true only inside applyPreset/resetView/initial
+      // smart-contrast — see the presetId snapshot below.
+      const vp = engineRef.current?.getViewport(myId);
+      if (!vp) return;
+      // Prefer the event's range payload (Cornerstone gives it to us
+      // directly); fall back to reading off the viewport for robustness.
+      let voiRange = evt?.detail?.range || null;
+      if (!voiRange) {
+        try {
+          const props = typeof vp.getProperties === 'function' ? vp.getProperties() : null;
+          if (props?.voiRange) voiRange = props.voiRange;
+        } catch { /* viewport torn down */ }
+      }
+      if (!voiRange) return;
+      // Snapshot the preset id at dispatch time. We CANNOT just read
+      // React's `activePreset` state via closure — by the time this
+      // listener runs, `setActivePreset(preset.id)` may have scheduled
+      // an update but the closure still sees the PREVIOUS render's
+      // value. Use `pendingPresetIdRef.current`, which applyPreset /
+      // resetView / initial-auto set SYNCHRONOUSLY right before
+      // calling setProperties. When the gate is shut
+      // (`isApplyingPresetRef.current === false`), the source is a
+      // user drag — force presetId to null regardless of what's in
+      // the ref (stale from a prior preset apply that's already over).
+      const presetId = isApplyingPresetRef.current
+        ? pendingPresetIdRef.current
+        : null;
+      try {
+        window.dispatchEvent(new CustomEvent(wlEvent, {
+          detail: { sourceId: myId, syncGroupId, voiRange, presetId },
+        }));
+      } catch { /* dispatch failed; ignore */ }
+    };
+
+    const onRemoteVoi = (evt) => {
+      if (!evt?.detail || evt.detail.sourceId === myId) return;
+      if (evt.detail.syncGroupId && evt.detail.syncGroupId !== syncGroupId) return;
+      const vp = engineRef.current?.getViewport(myId);
+      if (!vp || typeof vp.setProperties !== 'function') return;
+      const { voiRange, presetId } = evt.detail;
+      if (!voiRange) return;
+      try {
+        // Gate BOTH bounces:
+        //   • isApplyingWL = true so our onLocalVoi sees this as our
+        //     own write and skips re-dispatching (would create a loop).
+        //   • isApplyingPresetRef.current = true so the Phase 5
+        //     drift-clear handler doesn't immediately null activePreset
+        //     on the synchronous VOI_MODIFIED bounce.
+        isApplyingWL = true;
+        isApplyingPresetRef.current = true;
+        vp.setProperties({ voiRange });
+        vp.render();
+        // Mirror the cyan ring when the source explicitly told us so.
+        // For drags (presetId === null) we leave activePreset alone — the
+        // local Phase 5 drift handler is suppressed by isApplyingPresetRef
+        // above, so the ring won't get cleared by the apply itself; if
+        // there was no ring to begin with, nothing changes.
+        if (presetId) {
+          setActivePreset((cur) => (cur === presetId ? cur : presetId));
+        } else {
+          // User drag on the source pane — clear local ring (the W/L is
+          // now drifted by definition). Matches Phase 5 drift semantics.
+          setActivePreset((cur) => (cur === null ? cur : null));
+        }
+        // Both flags reset on the next animation frame, after the
+        // synchronous VOI_MODIFIED bounce has arrived + been ignored.
+        requestAnimationFrame(() => {
+          isApplyingWL = false;
+          isApplyingPresetRef.current = false;
+        });
+      } catch (err) {
+        console.error('[viewport-sync] wl apply error:', err);
+        isApplyingWL = false;
+        isApplyingPresetRef.current = false;
+      }
+    };
+
+    element.addEventListener(Enums.Events.VOI_MODIFIED, onLocalVoi);
+    window.addEventListener(wlEvent, onRemoteVoi);
+    return () => {
+      element.removeEventListener(Enums.Events.VOI_MODIFIED, onLocalVoi);
+      window.removeEventListener(wlEvent, onRemoteVoi);
+    };
+    // No React state read in closure — preset id is sourced from
+    // pendingPresetIdRef (synchronous, not React state) so we don't
+    // need to re-subscribe on every render. filesKey covers the
+    // viewport-replaced case.
+  }, [syncEnabled, syncWL, status, syncGroupId, filesKey]);
 
   // W/L drift detection — when the user drags W/L via the
   // WindowLevelTool after a preset is applied, the cyan ring should
@@ -1272,19 +1463,22 @@ export default function DicomViewport({
             <span style={{ opacity: 0.7, fontSize: '0.78em' }}>· กด <kbd style={kbdInlineStyle}>?</kbd> ดูทั้งหมด</span>
           </div>
         )}
-        {/* Norberg / VHS overlays are radiograph tools — single-slice by
-            design. We key off the primary (first) file so they stay anchored
-            to slice 0's anatomy. In stack mode, scrolling slices doesn't
-            invalidate the measurement (the overlay just renders over
-            whichever slice is currently visible — clinically that's a
-            display artifact rather than a bug since Norberg/VHS would not
-            be used on a CT stack anyway). */}
+        {/* Norberg / VHS overlays — primarily radiograph tools (single
+            slice), but Phase 8 (Agent ③) extends them to per-slice
+            anchoring in stack mode so a hip Norberg placed on slice 5
+            of a CT stack stays pinned to slice 5 (not floating over
+            lung slices when the user scrolls). currentSliceIndex +
+            isStackMode let the overlays gate rendering per-slice. */}
+        {/* AGENT-③ Phase 8 — pass currentSliceIndex + isStackMode for per-slice overlay anchoring */}
         {status === 'ready' && (
           <NorbergOverlay
             key={`norberg-${primaryFile?.name}-${primaryFile?.size}-${primaryFile?.lastModified || 0}`}
             active={activeTool === 'norberg'}
             viewportRef={getViewport}
             caseId={caseId}
+            currentSliceIndex={sliceIdx}
+            isStackMode={isStackMode}
+            onJumpToSlice={goToSlice}
           />
         )}
         {status === 'ready' && (
@@ -1294,6 +1488,9 @@ export default function DicomViewport({
             viewportRef={getViewport}
             caseId={caseId}
             species={species}
+            currentSliceIndex={sliceIdx}
+            isStackMode={isStackMode}
+            onJumpToSlice={goToSlice}
           />
         )}
         {/* Phase 5 — overlay slice indicator. Bottom-center, mirrors the

@@ -26,7 +26,30 @@ const STEPS = [
 const COLORS = ['#ff6b6b', '#6bb6ff', '#ffaa6b', '#6bffaa'];
 const LABELS = ['L♀', 'R♀', 'L⌃', 'R⌃'];
 
-export default function NorbergOverlay({ active, viewportRef, caseId = null, groundTruth = null }) {
+// Phase 8 (Agent ③) — per-slice anchoring.
+//
+// Measurement schema:
+//   { sliceIndex: number|null, points: world[] }
+//     sliceIndex = null   → single mode (radiograph, always visible)
+//     sliceIndex = N      → stack mode (CT/MR slice N · only visible when scrolled to N)
+//
+// In stack mode we keep ALL measurements (one per slice), but only the
+// one matching `currentSliceIndex` is interactive + rendered. A small
+// header badge tells the student "you've placed Norberg on N other
+// slices" and offers a quick jump.
+//
+// Backward compat: existing localStorage saves use `worldPoints` (flat
+// world[]) — the load path normalizes them as `{ sliceIndex: null,
+// points: [...] }` so old saves keep working in single mode.
+export default function NorbergOverlay({
+  active,
+  viewportRef,
+  caseId = null,
+  groundTruth = null,
+  currentSliceIndex = 0,
+  isStackMode = false,
+  onJumpToSlice = null,
+}) {
   const isMobile = useMediaQuery('(max-width: 600px)');
   // If the parent didn't pass `groundTruth`, look up the case by id
   // and read it from `recall.ground_truth.norberg`. This keeps the
@@ -43,12 +66,58 @@ export default function NorbergOverlay({ active, viewportRef, caseId = null, gro
   // it to a thin header bar so they can still see the image. Restored
   // when they tap the header again.
   const [cardCollapsed, setCardCollapsed] = useState(false);
-  // World-space points (3D). Persist across tool toggles until Reset.
-  const [worldPoints, setWorldPoints] = useState([]);
+  // Phase 8 — measurements list (one per slice in stack mode, or one
+  // total in single mode with sliceIndex=null).
+  const [measurements, setMeasurements] = useState([]);
   // Tick re-renders SVG positions when the camera moves (zoom/pan).
   // Polling is cheaper than wiring into Cornerstone's event system and
   // 80 ms is well below perceptual lag for an annotation overlay.
   const [, setTick] = useState(0);
+
+  // Active measurement = the one anchored to the current slice (or the
+  // single-mode entry). Returns null if no entry exists for this slice
+  // — the click handler creates one on first click.
+  const activeAnchor = isStackMode ? currentSliceIndex : null;
+  const activeMeasurement = useMemo(() => {
+    return measurements.find((m) => m.sliceIndex === activeAnchor) || null;
+  }, [measurements, activeAnchor]);
+  // Wrap in useMemo so the empty-array fallback doesn't change identity
+  // every render (otherwise downstream useCallback/useMemo dep arrays
+  // see worldPoints as "new" each render → exhaustive-deps lint warns).
+  const EMPTY_POINTS = useMemo(() => [], []);
+  const worldPoints = activeMeasurement?.points || EMPTY_POINTS;
+
+  // Other-slice measurements (only meaningful in stack mode). Used to
+  // render the "📐 Norberg (N other slices)" badge so the student knows
+  // their work wasn't lost when they scrolled.
+  const otherSliceMeasurements = useMemo(() => {
+    if (!isStackMode) return [];
+    return measurements.filter(
+      (m) => m.sliceIndex !== activeAnchor && m.points.length > 0
+    );
+  }, [measurements, activeAnchor, isStackMode]);
+
+  // Mutate the active measurement's points. Creates the entry lazily
+  // if it doesn't exist yet (first click on a fresh slice in stack mode).
+  const updateActivePoints = useCallback((mutator) => {
+    setMeasurements((prev) => {
+      const idx = prev.findIndex((m) => m.sliceIndex === activeAnchor);
+      if (idx === -1) {
+        const startingPoints = mutator([]);
+        if (startingPoints.length === 0) return prev;
+        return [...prev, { sliceIndex: activeAnchor, points: startingPoints }];
+      }
+      const nextPoints = mutator(prev[idx].points);
+      // Drop the entry entirely if it ends up empty — keeps the "other
+      // slices" badge count honest after Undo wipes a measurement.
+      if (nextPoints.length === 0) {
+        return prev.filter((_, i) => i !== idx);
+      }
+      return prev.map((m, i) =>
+        i === idx ? { ...m, points: nextPoints } : m
+      );
+    });
+  }, [activeAnchor]);
 
   useEffect(() => {
     if (!active || worldPoints.length === 0) return;
@@ -59,8 +128,9 @@ export default function NorbergOverlay({ active, viewportRef, caseId = null, gro
   // Global "clear" listener — the toolbar 🗑 Clear button dispatches
   // this so a single click wipes both Cornerstone annotations and
   // custom-overlay points without callback wiring.
+  // Phase 8: clears ALL slices' measurements (matches "Reset" expectation).
   useEffect(() => {
-    const onClear = () => setWorldPoints([]);
+    const onClear = () => setMeasurements([]);
     window.addEventListener('vmx-lab-clear-overlays', onClear);
     return () => window.removeEventListener('vmx-lab-clear-overlays', onClear);
   }, []);
@@ -69,14 +139,14 @@ export default function NorbergOverlay({ active, viewportRef, caseId = null, gro
   // don't both pop a point on the same U keypress.
   useEffect(() => {
     if (!active) return;
-    const onUndo = () => setWorldPoints((prev) => prev.slice(0, -1));
+    const onUndo = () => updateActivePoints((prev) => prev.slice(0, -1));
     window.addEventListener('vmx-lab-undo-point', onUndo);
     return () => window.removeEventListener('vmx-lab-undo-point', onUndo);
-  }, [active]);
+  }, [active, updateActivePoints]);
 
   const undo = useCallback(() => {
-    setWorldPoints((prev) => prev.slice(0, -1));
-  }, []);
+    updateActivePoints((prev) => prev.slice(0, -1));
+  }, [updateActivePoints]);
 
   const exportStateJson = useCallback(() => {
     if (worldPoints.length < 4) return;
@@ -91,6 +161,7 @@ export default function NorbergOverlay({ active, viewportRef, caseId = null, gro
       version: 1,
       model: 'manual-norberg',
       created_at: new Date().toISOString(),
+      slice_index: activeAnchor, // Phase 8 — record slice anchor
       predictions: {
         norberg: {
           points: {
@@ -114,7 +185,7 @@ export default function NorbergOverlay({ active, viewportRef, caseId = null, gro
     a.click();
     document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  }, [worldPoints]);
+  }, [worldPoints, activeAnchor]);
 
   const screenPoints = useMemo(() => {
     const vp = viewportRef?.();
@@ -164,12 +235,11 @@ export default function NorbergOverlay({ active, viewportRef, caseId = null, gro
     if (worldPoints.length >= 4) return;
     try {
       const world = vp.canvasToWorld([cx, cy]);
-      setWorldPoints((prev) => [...prev, world]);
+      updateActivePoints((prev) => [...prev, world]);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('[NorbergOverlay] canvasToWorld error:', err);
     }
-  }, [active, worldPoints, viewportRef]);
+  }, [active, worldPoints, viewportRef, updateActivePoints]);
 
   // While dragging a point, listen on window so the pointer can
   // leave the overlay without losing the drag.
@@ -186,7 +256,7 @@ export default function NorbergOverlay({ active, viewportRef, caseId = null, gro
       const cy = e.clientY - rect.top;
       try {
         const world = vp.canvasToWorld([cx, cy]);
-        setWorldPoints((prev) => prev.map((p, i) => (i === draggingIdx ? world : p)));
+        updateActivePoints((prev) => prev.map((p, i) => (i === draggingIdx ? world : p)));
       } catch { /* canvasToWorld failed mid-drag */ }
     };
     const onUp = () => {
@@ -201,14 +271,16 @@ export default function NorbergOverlay({ active, viewportRef, caseId = null, gro
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
     };
-  }, [draggingIdx, viewportRef]);
+  }, [draggingIdx, viewportRef, updateActivePoints]);
 
   // 2-step reset confirm to prevent accidentally wiping 4-click work.
   // First click → "ยืนยัน Reset?" for 3 s. Second click within window
   // → wipe. After timeout → revert to plain "Reset".
+  // Phase 8: Reset wipes ALL slices' measurements (matches existing
+  // "Reset" expectation — students think "Reset" = start over fully).
   const [confirmingReset, setConfirmingReset] = useState(false);
   const reset = useCallback(() => {
-    setWorldPoints((prev) => {
+    setMeasurements((prev) => {
       if (prev.length === 0) return prev;
       if (!confirmingReset) {
         setConfirmingReset(true);
@@ -230,12 +302,14 @@ export default function NorbergOverlay({ active, viewportRef, caseId = null, gro
     setSaveState({ status: 'saving', msg: null });
     // Standalone build — no Supabase backend wired Day 1. Persist to
     // localStorage so attempts survive page reload + export via JSON button.
+    // Phase 8 — slice_index recorded for stack-mode replay.
     try {
       const key = 'cuvi-norberg-attempts';
       const prev = JSON.parse(localStorage.getItem(key) || '[]');
       prev.push({
         ts: new Date().toISOString(),
         caseId: caseId || null,
+        sliceIndex: activeAnchor,
         worldPoints, left, right, classification: cls,
       });
       localStorage.setItem(key, JSON.stringify(prev.slice(-200)));
@@ -244,7 +318,7 @@ export default function NorbergOverlay({ active, viewportRef, caseId = null, gro
     } catch (e) {
       setSaveState({ status: 'error', msg: `บันทึก local ไม่สำเร็จ: ${e?.message || e}` });
     }
-  }, [worldPoints, caseId]);
+  }, [worldPoints, caseId, activeAnchor]);
 
   const angles = useMemo(() => {
     if (worldPoints.length < 4) return null;
@@ -274,6 +348,19 @@ export default function NorbergOverlay({ active, viewportRef, caseId = null, gro
   if (!active) return null;
 
   const nextLabel = STEPS[worldPoints.length];
+
+  // Phase 8 — "jump to first other-slice measurement" handler. Picks the
+  // smallest slice index in `otherSliceMeasurements` and asks the parent
+  // (DicomViewport) to scroll there via the goToSlice callback.
+  const jumpToOtherSlice = () => {
+    if (!onJumpToSlice || otherSliceMeasurements.length === 0) return;
+    const sorted = [...otherSliceMeasurements]
+      .map((m) => m.sliceIndex)
+      .filter((i) => typeof i === 'number')
+      .sort((a, b) => a - b);
+    if (sorted.length === 0) return;
+    onJumpToSlice(sorted[0]);
+  };
 
   return (
     <div
@@ -338,6 +425,37 @@ export default function NorbergOverlay({ active, viewportRef, caseId = null, gro
           : '🦴 Norberg — ครบ 4 จุด ลากจุดเพื่อปรับ ดูผลด้านล่าง'}
       </div>
 
+      {/* Phase 8 — other-slice badge. Only shown in stack mode when the
+          student has at least one measurement on a slice they're not
+          currently viewing. Clickable when onJumpToSlice is wired.
+          Prevents the "did I lose my measurement?" panic when scrolling. */}
+      {isStackMode && otherSliceMeasurements.length > 0 && (
+        <div
+          style={otherSliceBadgeStyle}
+          role={onJumpToSlice ? 'button' : 'note'}
+          tabIndex={onJumpToSlice ? 0 : -1}
+          onClick={onJumpToSlice ? jumpToOtherSlice : undefined}
+          onKeyDown={onJumpToSlice ? (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              jumpToOtherSlice();
+            }
+          } : undefined}
+          aria-label={
+            `Norberg measurements exist on ${otherSliceMeasurements.length} other ${otherSliceMeasurements.length === 1 ? 'slice' : 'slices'}: ${otherSliceMeasurements.map((m) => m.sliceIndex + 1).join(', ')}` +
+            (onJumpToSlice ? ' · activate to jump' : '')
+          }
+        >
+          📐 Norberg on {otherSliceMeasurements.length} other{' '}
+          {otherSliceMeasurements.length === 1 ? 'slice' : 'slices'}
+          {onJumpToSlice && (
+            <span style={{ opacity: 0.7, marginLeft: 6, fontSize: '0.78em' }}>
+              → click to jump
+            </span>
+          )}
+        </div>
+      )}
+
       {angles && (
         <div style={isMobile ? (cardCollapsed ? mobileSheetCollapsedStyle : mobileSheetStyle) : resultCardStyle}>
           <div
@@ -354,6 +472,11 @@ export default function NorbergOverlay({ active, viewportRef, caseId = null, gro
           >
             <span>
               Norberg angle result
+              {isStackMode && (
+                <span style={{ marginLeft: 6, fontWeight: 400, opacity: 0.7, fontSize: '0.78em' }}>
+                  (slice {currentSliceIndex + 1})
+                </span>
+              )}
               {isMobile && cardCollapsed && (
                 <span style={{ marginLeft: 8, fontWeight: 400, opacity: 0.8, fontSize: '0.82em' }}>
                   L {angles.left.toFixed(1)}° · R {angles.right.toFixed(1)}°
@@ -420,7 +543,13 @@ export default function NorbergOverlay({ active, viewportRef, caseId = null, gro
             <button
               onClick={reset}
               style={{ ...resetBtnStyle, background: confirmingReset ? '#b85450' : '#444' }}
-              title={confirmingReset ? 'คลิกอีกครั้งใน 3 วินาทีเพื่อยืนยันลบทั้งหมด' : 'ลบ Norberg points ทั้งหมด'}
+              title={
+                confirmingReset
+                  ? 'คลิกอีกครั้งใน 3 วินาทีเพื่อยืนยันลบทั้งหมด'
+                  : (isStackMode
+                      ? `ลบ Norberg points ทุก slice (${measurements.length} measurement${measurements.length === 1 ? '' : 's'})`
+                      : 'ลบ Norberg points ทั้งหมด')
+              }
             >
               {confirmingReset ? '⚠️ ยืนยัน Reset?' : '↺ Reset'}
             </button>
@@ -482,6 +611,23 @@ const topBannerStyle = {
   fontSize: '0.85rem',
   pointerEvents: 'none',
   zIndex: 1,
+};
+
+// Phase 8 — "you have measurements on other slices" badge. Sits just
+// below the top progress banner so it's noticeable without crowding the
+// canvas. Clickable to jump when the parent provides onJumpToSlice.
+const otherSliceBadgeStyle = {
+  position: 'absolute',
+  top: 44, left: 8,
+  background: 'rgba(74, 107, 138, 0.92)',
+  color: '#fff',
+  padding: '4px 10px',
+  borderRadius: 4,
+  fontSize: '0.76rem',
+  pointerEvents: 'auto',
+  cursor: 'pointer',
+  zIndex: 2,
+  border: '1px solid rgba(255,255,255,0.2)',
 };
 
 const resultCardStyle = {

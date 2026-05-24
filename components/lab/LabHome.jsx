@@ -50,6 +50,53 @@ const RECENT_MAX = 5;
 // grid, not to the import pipeline. Import path uses MAX_BATCH_FILES.
 const MAX_FILES = MAX_SIDE_BY_SIDE;
 
+// AGENT-④ Phase 8 — compare-mode per-axis sync preferences.
+// Persisted across sessions so opening a new compare doesn't reset
+// the user's preferred sync mix. Schema is intentionally narrow so
+// future axes (annotation? zoom level? rotation?) can extend without
+// breaking older saved shapes — unknown keys are merged with the
+// defaults. Versioned key (`-v1`) for forward compatibility.
+const COMPARE_SYNC_KEY = 'cuvi-compare-sync-axes-v1';
+const COMPARE_SYNC_DEFAULTS = Object.freeze({
+  slice: true,    // proportional slice-index mirror (Phase 6 default)
+  camera: true,   // pan/zoom/rotation mirror (Phase 6 default)
+  wl: false,      // Phase 8 — opt-in; clinicians often want different W/L per pane
+});
+
+function readCompareSyncAxes() {
+  try {
+    const raw = localStorage.getItem(COMPARE_SYNC_KEY);
+    if (!raw) return COMPARE_SYNC_DEFAULTS;
+    const parsed = JSON.parse(raw);
+    // Merge with defaults so partial / older shapes still work.
+    return {
+      slice: typeof parsed.slice === 'boolean' ? parsed.slice : COMPARE_SYNC_DEFAULTS.slice,
+      camera: typeof parsed.camera === 'boolean' ? parsed.camera : COMPARE_SYNC_DEFAULTS.camera,
+      wl: typeof parsed.wl === 'boolean' ? parsed.wl : COMPARE_SYNC_DEFAULTS.wl,
+    };
+  } catch {
+    return COMPARE_SYNC_DEFAULTS;
+  }
+}
+
+function writeCompareSyncAxes(axes) {
+  try { localStorage.setItem(COMPARE_SYNC_KEY, JSON.stringify(axes)); } catch { /* quota */ }
+}
+
+// Compact human-readable summary for the toggle title attribute.
+// "Slice + Camera" / "All axes" / "W/L only" / "OFF". Used in the
+// tooltip so the user can hover and see at a glance what's wired
+// without opening the popover.
+function describeSyncAxes(axes) {
+  const on = [];
+  if (axes.slice) on.push('Slice');
+  if (axes.camera) on.push('Camera');
+  if (axes.wl) on.push('W/L');
+  if (on.length === 0) return 'OFF';
+  if (on.length === 3) return 'All axes';
+  return on.join(' + ');
+}
+
 // Peek at a DataTransferItemList to see if any item is a directory.
 // Used to decide whether the "skipped non-DICOM" tally is meaningful —
 // for folder drops the input count is 1 item but the discovered count
@@ -80,10 +127,28 @@ export default function LabHome() {
   // TWO STACK panes side-by-side with synced scroll. Auto-derived by
   // file count when not explicitly set via `openInMode(files, mode)`.
   const [viewMode, setViewMode] = useState('single');
-  // Phase 6 — synced-compare toggle. Default ON when the user explicitly
-  // opens via the "compare 2 series" CTA; can be toggled off in the
-  // toolbar to scroll panes independently for differential reads.
-  const [syncCompareEnabled, setSyncCompareEnabled] = useState(true);
+  // Phase 6 / AGENT-④ Phase 8 — per-axis synced-compare state.
+  //
+  // Phase 6 used a single boolean `syncCompareEnabled` for slice + camera
+  // together. Phase 8 splits it into three independent axes so users can
+  // opt into W/L sync without giving up the slice/camera default — and
+  // can also disable slice while keeping camera (or any other mix).
+  //
+  // Defaults: slice ON · camera ON · W/L OFF. The W/L default is OFF
+  // because clinicians comparing normal vs cardiomegaly often want
+  // different presets per pane (bone left vs lung right). The user
+  // explicitly opts into W/L sync via the chrome popover.
+  //
+  // Persisted to localStorage so the preference sticks across sessions.
+  // Hydration is deferred to a microtask (same pattern as `recent`) to
+  // avoid React-Compiler "no setState sync in effect" warnings.
+  const [compareSyncAxes, setCompareSyncAxes] = useState(COMPARE_SYNC_DEFAULTS);
+  const [syncPopoverOpen, setSyncPopoverOpen] = useState(false);
+  const syncPopoverRef = useRef(null);
+  // Derived master gate — passed to ViewerPane as `syncEnabled`. When
+  // every axis is off, we short-circuit the listeners entirely. This
+  // also drives the "🔗 Sync ON / ⛓‍💥 Sync OFF" label on the toggle.
+  const anySyncOn = compareSyncAxes.slice || compareSyncAxes.camera || compareSyncAxes.wl;
   const [error, setError] = useState(null);
   const [recent, setRecent] = useState([]);
 
@@ -111,8 +176,46 @@ export default function LabHome() {
         const raw = localStorage.getItem(RECENT_KEY);
         if (raw) setRecent(JSON.parse(raw));
       } catch { /* corrupt JSON; ignore */ }
+      // AGENT-④ Phase 8 — hydrate compare-sync preferences. Same
+      // microtask-defer pattern so the initial render is the default
+      // (matches SSR if ever added) and the saved prefs apply on the
+      // next tick. Visually imperceptible.
+      const axes = readCompareSyncAxes();
+      setCompareSyncAxes(axes);
     });
   }, []);
+
+  // AGENT-④ Phase 8 — single toggle for a per-axis sync flag. Persists
+  // to localStorage on every change so refreshing mid-compare preserves
+  // the user's preferred mix. Functional setter avoids stale-closure
+  // bugs when several toggles fire close together (rare but cheap to
+  // guard against).
+  const toggleSyncAxis = useCallback((axis) => {
+    setCompareSyncAxes((prev) => {
+      const next = { ...prev, [axis]: !prev[axis] };
+      writeCompareSyncAxes(next);
+      return next;
+    });
+  }, []);
+
+  // AGENT-④ Phase 8 — close popover on outside click / Escape. Same
+  // contract MobileToolbarSheet uses elsewhere in the lab.
+  useEffect(() => {
+    if (!syncPopoverOpen) return;
+    const onDocClick = (evt) => {
+      const root = syncPopoverRef.current;
+      if (root && !root.contains(evt.target)) setSyncPopoverOpen(false);
+    };
+    const onKey = (evt) => {
+      if (evt.key === 'Escape') setSyncPopoverOpen(false);
+    };
+    document.addEventListener('pointerdown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [syncPopoverOpen]);
 
   const addToRecent = useCallback((f) => {
     if (!f) return;
@@ -154,9 +257,12 @@ export default function LabHome() {
       }
       setFiles(nextFiles);
       setViewMode('side-by-side-stack');
-      // Default sync ON for new compare sessions; the user can toggle off
-      // via the toolbar button.
-      setSyncCompareEnabled(true);
+      // AGENT-④ Phase 8 — sync axes are persisted across sessions, so
+      // we DON'T reset on a new compare open. Users who turn W/L sync
+      // on once keep it on for subsequent compares; same for any axis
+      // they turned off. (Previously: defaulted slice+camera ON every
+      // time. Now defaults only apply on first-ever use or after
+      // localStorage clear.)
       return;
     }
     const resolved = mode || autoModeForFiles(nextFiles.length);
@@ -599,17 +705,57 @@ export default function LabHome() {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {isSideBySideStack && (
-              <button
-                onClick={() => setSyncCompareEnabled((v) => !v)}
-                className="vmx-btn vmx-btn-sm"
-                title={syncCompareEnabled
-                  ? 'Sync ON — scroll one pane and the other follows. Click to disable.'
-                  : 'Sync OFF — panes scroll independently. Click to re-enable.'}
-                aria-pressed={syncCompareEnabled}
-                style={syncCompareEnabled ? syncToggleOnStyle : syncToggleOffStyle}
-              >
-                {syncCompareEnabled ? '🔗 Sync ON' : '⛓‍💥 Sync OFF'}
-              </button>
+              // AGENT-④ Phase 8 — single toggle opens a popover with one
+              // checkbox per sync axis (slice / camera / W/L). Chose the
+              // popover over three separate buttons in the chrome bar
+              // because (a) chrome real estate is tight on tablets, (b)
+              // the "sync" mental model is one concept with sub-options,
+              // not three independent toggles. The button label reflects
+              // the aggregate (ON if any axis on · OFF if all off).
+              <div style={syncPopoverWrapStyle} ref={syncPopoverRef}>
+                <button
+                  onClick={() => setSyncPopoverOpen((v) => !v)}
+                  className="vmx-btn vmx-btn-sm"
+                  title={anySyncOn
+                    ? `Sync settings — ${describeSyncAxes(compareSyncAxes)}. Click to change.`
+                    : 'Sync OFF — panes are fully independent. Click to enable.'}
+                  aria-pressed={anySyncOn}
+                  aria-haspopup="menu"
+                  aria-expanded={syncPopoverOpen}
+                  style={anySyncOn ? syncToggleOnStyle : syncToggleOffStyle}
+                >
+                  {anySyncOn ? '🔗 Sync' : '⛓‍💥 Sync OFF'}
+                  <span style={syncToggleCaretStyle} aria-hidden="true">▾</span>
+                </button>
+                {syncPopoverOpen && (
+                  <div
+                    role="menu"
+                    aria-label="Compare-mode sync settings"
+                    style={syncPopoverStyle}
+                  >
+                    <div style={syncPopoverHeaderStyle}>Sync between panes</div>
+                    <SyncAxisRow
+                      label="Slice"
+                      hint="Scroll one stack → other follows (proportional)."
+                      checked={compareSyncAxes.slice}
+                      onToggle={() => toggleSyncAxis('slice')}
+                    />
+                    <SyncAxisRow
+                      label="Camera"
+                      hint="Pan, zoom & rotation mirror across panes."
+                      checked={compareSyncAxes.camera}
+                      onToggle={() => toggleSyncAxis('camera')}
+                    />
+                    <SyncAxisRow
+                      label="W/L"
+                      hint="Window/level (incl. presets) mirror. Off by default — useful when comparing different W/L per pane."
+                      checked={compareSyncAxes.wl}
+                      onToggle={() => toggleSyncAxis('wl')}
+                      isNew
+                    />
+                  </div>
+                )}
+              </div>
             )}
             <button onClick={reset} className="vmx-btn vmx-btn-ghost vmx-btn-sm">← Back to drop zone</button>
           </div>
@@ -627,6 +773,11 @@ export default function LabHome() {
           //
           // Mobile (<768px): grid collapses to one column so the panes
           // stack vertically. Side-by-side at 375 px would be unreadable.
+          //
+          // AGENT-④ Phase 8 — per-axis sync flags passed through. The
+          // master `syncEnabled` gate short-circuits the listeners when
+          // every axis is off (no listener registration cost when sync
+          // is fully disabled).
           <div style={isNarrow ? compareGridMobileStyle : compareGridStyle}>
             {[0, 1].map((paneIdx) => {
               const paneFiles = files[paneIdx] || [];
@@ -640,7 +791,10 @@ export default function LabHome() {
                   mode="stack"
                   index={paneIdx}
                   canRemove={false}
-                  syncEnabled={syncCompareEnabled}
+                  syncEnabled={anySyncOn}
+                  syncSlice={compareSyncAxes.slice}
+                  syncCamera={compareSyncAxes.camera}
+                  syncWL={compareSyncAxes.wl}
                   syncGroupId="compare"
                   paneLabel={label}
                 />
@@ -1169,6 +1323,48 @@ function ToolTile({ href, title, desc, meta, art }) {
   );
 }
 
+// AGENT-④ Phase 8 — single row in the sync-settings popover. Renders
+// label + hint + checkbox in a clickable card. `isNew` adds a subtle
+// "NEW" pill so users notice the W/L sync option on first open after
+// the Phase 8 ship. Checkbox is a styled <button> with aria-pressed
+// (not a native <input type="checkbox">) so the touch target is the
+// full row + we control the visual without resetting native styles.
+function SyncAxisRow({ label, hint, checked, onToggle, isNew = false }) {
+  return (
+    <button
+      role="menuitemcheckbox"
+      aria-checked={checked}
+      onClick={onToggle}
+      style={{
+        ...syncAxisRowStyle,
+        background: checked ? 'rgba(6,182,212,0.08)' : 'transparent',
+        borderColor: checked ? 'rgba(6,182,212,0.35)' : 'transparent',
+      }}
+    >
+      <div style={syncAxisRowMainStyle}>
+        <div style={syncAxisRowLabelStyle}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            {label}
+            {isNew && <span style={syncAxisNewPillStyle}>NEW</span>}
+          </span>
+          <span
+            aria-hidden="true"
+            style={{
+              ...syncAxisCheckStyle,
+              background: checked ? 'rgba(6,182,212,0.95)' : 'transparent',
+              borderColor: checked ? 'rgba(6,182,212,0.95)' : 'var(--color-border)',
+              color: checked ? '#fff' : 'transparent',
+            }}
+          >
+            ✓
+          </span>
+        </div>
+        <div style={syncAxisRowHintStyle}>{hint}</div>
+      </div>
+    </button>
+  );
+}
+
 // Single viewer pane wrapper — file label + DicomViewport + Tag panel.
 //
 // Accepts EITHER `file: File` (legacy single-image / side-by-side workflow)
@@ -1190,6 +1386,12 @@ function ViewerPane({
   canRemove,
   onRemove,
   syncEnabled = false,
+  // AGENT-④ Phase 8 — per-axis sync flags. Defaults preserve Phase 6
+  // behavior (slice + camera ON, W/L OFF) for any caller that hasn't
+  // been updated to thread the new props.
+  syncSlice = true,
+  syncCamera = true,
+  syncWL = false,
   syncGroupId = 'default',
   paneLabel = null,
 }) {
@@ -1238,6 +1440,9 @@ function ViewerPane({
             mode="stack"
             caseId={null}
             syncEnabled={syncEnabled}
+            syncSlice={syncSlice}
+            syncCamera={syncCamera}
+            syncWL={syncWL}
             syncGroupId={syncGroupId}
             paneLabel={paneLabel}
           />
@@ -1246,6 +1451,9 @@ function ViewerPane({
             file={primary}
             caseId={null}
             syncEnabled={syncEnabled}
+            syncSlice={syncSlice}
+            syncCamera={syncCamera}
+            syncWL={syncWL}
             syncGroupId={syncGroupId}
             paneLabel={paneLabel}
           />
@@ -1306,6 +1514,94 @@ const syncToggleOffStyle = {
   fontSize: '0.78rem',
   fontWeight: 500,
   cursor: 'pointer',
+};
+// AGENT-④ Phase 8 — sync settings popover styles. The wrap is
+// position:relative so the absolute popover anchors to the button. We
+// don't use a portal because the popover is small + sits below the
+// header (no overflow:hidden parents in the chrome area).
+const syncPopoverWrapStyle = {
+  position: 'relative',
+  display: 'inline-flex',
+};
+const syncToggleCaretStyle = {
+  marginLeft: 6,
+  fontSize: '0.7rem',
+  opacity: 0.7,
+};
+const syncPopoverStyle = {
+  position: 'absolute',
+  top: 'calc(100% + 6px)',
+  right: 0,
+  zIndex: 30,
+  minWidth: 280,
+  maxWidth: 'min(360px, 90vw)',
+  background: 'var(--color-surface-2, #1a1d24)',
+  border: '1px solid var(--color-border, rgba(255,255,255,0.12))',
+  borderRadius: 6,
+  padding: 6,
+  boxShadow: '0 8px 24px rgba(0,0,0,0.35), 0 0 0 1px rgba(6,182,212,0.08)',
+  fontSize: '0.8rem',
+  color: 'var(--color-text-primary, #e5e7eb)',
+};
+const syncPopoverHeaderStyle = {
+  padding: '6px 10px 8px',
+  fontSize: '0.7rem',
+  letterSpacing: 0.4,
+  textTransform: 'uppercase',
+  color: 'var(--color-text-muted)',
+  fontWeight: 600,
+};
+const syncAxisRowStyle = {
+  display: 'block',
+  width: '100%',
+  textAlign: 'left',
+  padding: '8px 10px',
+  margin: '2px 0',
+  background: 'transparent',
+  border: '1px solid transparent',
+  borderRadius: 5,
+  cursor: 'pointer',
+  color: 'inherit',
+  font: 'inherit',
+};
+const syncAxisRowMainStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 3,
+};
+const syncAxisRowLabelStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  fontWeight: 600,
+  fontSize: '0.85rem',
+};
+const syncAxisRowHintStyle = {
+  fontSize: '0.72rem',
+  lineHeight: 1.35,
+  color: 'var(--color-text-muted)',
+};
+const syncAxisCheckStyle = {
+  width: 18,
+  height: 18,
+  borderRadius: 4,
+  border: '1px solid var(--color-border)',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: '0.7rem',
+  fontWeight: 700,
+  transition: 'background-color 120ms ease, border-color 120ms ease, color 120ms ease',
+};
+const syncAxisNewPillStyle = {
+  fontSize: '0.6rem',
+  fontWeight: 700,
+  letterSpacing: 0.6,
+  padding: '1px 6px',
+  borderRadius: 999,
+  background: 'rgba(6,182,212,0.18)',
+  color: '#0891b2',
+  border: '1px solid rgba(6,182,212,0.4)',
 };
 const paneStyle = {
   border: '1px solid var(--color-border)',
