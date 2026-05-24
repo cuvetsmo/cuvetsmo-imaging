@@ -334,11 +334,15 @@ export function DDxRankerCard({ caseMeta, expertDdx, extraExcludes, onSubmit, on
                     {name}
                   </span>
                   <div className="shrink-0 flex items-center gap-1">
+                    {/* Phase 9: 28→44 floor across all three slot controls.
+                        Three back-to-back 28px buttons at the right edge of
+                        each ranked slot were a mistap minefield on a phone.
+                        Now each is 44×44 with the icon centered. */}
                     <button
                       type="button"
                       onClick={() => moveSlot(i, -1)}
                       disabled={i === 0}
-                      className="w-7 h-7 rounded border border-[var(--color-border)] bg-[var(--color-surface-3)] text-[var(--color-text-muted)] hover:border-[var(--color-tool-cyan)] hover:text-[var(--color-tool-cyan)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-mono text-xs"
+                      className="w-11 h-11 inline-flex items-center justify-center rounded border border-[var(--color-border)] bg-[var(--color-surface-3)] text-[var(--color-text-muted)] hover:border-[var(--color-tool-cyan)] hover:text-[var(--color-tool-cyan)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-mono text-sm"
                       aria-label={`Move "${name}" up`}
                       title="Move up"
                     >
@@ -348,7 +352,7 @@ export function DDxRankerCard({ caseMeta, expertDdx, extraExcludes, onSubmit, on
                       type="button"
                       onClick={() => moveSlot(i, 1)}
                       disabled={i === 2}
-                      className="w-7 h-7 rounded border border-[var(--color-border)] bg-[var(--color-surface-3)] text-[var(--color-text-muted)] hover:border-[var(--color-tool-cyan)] hover:text-[var(--color-tool-cyan)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-mono text-xs"
+                      className="w-11 h-11 inline-flex items-center justify-center rounded border border-[var(--color-border)] bg-[var(--color-surface-3)] text-[var(--color-text-muted)] hover:border-[var(--color-tool-cyan)] hover:text-[var(--color-tool-cyan)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-mono text-sm"
                       aria-label={`Move "${name}" down`}
                       title="Move down"
                     >
@@ -357,7 +361,7 @@ export function DDxRankerCard({ caseMeta, expertDdx, extraExcludes, onSubmit, on
                     <button
                       type="button"
                       onClick={() => togglePick(name!)}
-                      className="w-7 h-7 rounded border border-[var(--color-border)] bg-[var(--color-surface-3)] text-[var(--color-text-faint)] hover:border-[var(--color-tool-violet)] hover:text-[var(--color-tool-violet)] transition-colors font-mono text-xs"
+                      className="w-11 h-11 inline-flex items-center justify-center rounded border border-[var(--color-border)] bg-[var(--color-surface-3)] text-[var(--color-text-faint)] hover:border-[var(--color-tool-violet)] hover:text-[var(--color-tool-violet)] transition-colors font-mono text-sm"
                       aria-label={`Remove "${name}"`}
                       title="Remove"
                     >
@@ -394,7 +398,10 @@ export function DDxRankerCard({ caseMeta, expertDdx, extraExcludes, onSubmit, on
                 type="button"
                 onClick={() => togglePick(opt.name)}
                 disabled={!placed && filledCount >= 3}
-                className={`text-left rounded-md border px-3 py-2 text-sm transition-colors flex items-center gap-2 min-w-0 ${
+                // Phase 9: min-h-[44px] so option-pool buttons match the
+                // ranked-slot rows above. py-2 on its own gave ~30px tap
+                // height — easy to mis-tap into the adjacent option.
+                className={`text-left rounded-md border px-3 py-2 min-h-[44px] text-sm transition-colors flex items-center gap-2 min-w-0 ${
                   placed
                     ? 'border-[var(--color-tool-cyan)] bg-[rgba(90,204,230,0.12)] text-[var(--color-tool-cyan)]'
                     : 'border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text)] hover:border-[var(--color-border-bright)] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-[var(--color-border)]'
@@ -439,7 +446,10 @@ export function DDxRankerCard({ caseMeta, expertDdx, extraExcludes, onSubmit, on
           <button
             type="button"
             onClick={clearAll}
-            className="text-[11px] font-mono uppercase tracking-wider text-[var(--color-text-faint)] hover:text-[var(--color-tool-violet)] transition-colors"
+            // Phase 9: inline-flex + 44px floor so the small-text Clear all
+            // affordance still has a tappable area on mobile. Negative
+            // horizontal margin keeps the visual rhythm of the row.
+            className="inline-flex items-center min-h-[44px] px-2 -mx-2 text-[11px] font-mono uppercase tracking-wider text-[var(--color-text-faint)] hover:text-[var(--color-tool-violet)] transition-colors"
           >
             Clear all
           </button>
@@ -449,12 +459,13 @@ export function DDxRankerCard({ caseMeta, expertDdx, extraExcludes, onSubmit, on
         </span>
       </div>
 
-      {/* Skip-ranker affordance */}
+      {/* Skip-ranker affordance — Phase 9: 44px floor + negative margin
+          so a small text link still has a real tap area on mobile. */}
       <div className="mt-4 pt-3 border-t border-[var(--color-border)] flex">
         <button
           type="button"
           onClick={onSkip}
-          className="text-[11px] sm:text-xs font-mono uppercase tracking-wider text-[var(--color-text-faint)] hover:text-[var(--color-tool-cyan)] transition-colors"
+          className="inline-flex items-center min-h-[44px] px-2 -mx-2 text-[11px] sm:text-xs font-mono uppercase tracking-wider text-[var(--color-text-faint)] hover:text-[var(--color-tool-cyan)] transition-colors"
           title="Skip the ranking step and reveal expert findings"
         >
           Skip ranking · just reveal →

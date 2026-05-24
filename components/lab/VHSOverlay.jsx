@@ -635,13 +635,20 @@ const mobileSheetCollapsedStyle = {
   boxShadow: '0 -2px 8px rgba(0,0,0,0.25)',
 };
 
+// Phase 9: same touch-target bump as NorbergOverlay — these row
+// buttons live on a card that overlays the canvas, where a missed
+// tap can deselect the measurement and require restart. 44px floor.
 const resetBtnStyle = {
   marginTop: 8,
-  padding: '4px 10px',
+  padding: '10px 14px',
+  minHeight: 44,
   background: '#444',
   color: '#fff',
   border: '1px solid #777',
   borderRadius: 4,
   cursor: 'pointer',
-  fontSize: '0.75rem',
+  fontSize: '0.78rem',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
 };

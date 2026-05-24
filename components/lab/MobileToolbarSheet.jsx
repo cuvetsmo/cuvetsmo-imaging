@@ -336,16 +336,23 @@ const backdropStyle = {
   animation: 'cuvi-sheet-fade-in 160ms ease-out',
 };
 
+// Phase 9: maxHeight 78vh→70vh per spec. Leaves ~30vh of canvas
+// visible behind the drawer so the student keeps context (which
+// finding is on the image · where the cursor was) while picking
+// the next tool. Bottom padding stays generous so a tap inside
+// the last button doesn't bleed into the home-bar zone on iOS.
 const sheetStyle = {
   width: '100%',
   maxWidth: 480,
-  maxHeight: '78vh',
+  maxHeight: '70vh',
   background: 'var(--color-surface-2)',
   borderTopLeftRadius: 18,
   borderTopRightRadius: 18,
   borderTop: '1px solid var(--color-border-bright)',
   boxShadow: '0 -12px 36px rgba(0, 0, 0, 0.45)',
-  padding: '8px 16px 24px',
+  // Add iOS safe-area-inset-bottom so the home-indicator on iPhones
+  // X+ doesn't sit on top of the last action row.
+  padding: '8px 16px max(24px, env(safe-area-inset-bottom))',
   color: 'var(--color-text)',
   display: 'flex',
   flexDirection: 'column',
@@ -374,16 +381,23 @@ const titleStyle = {
   letterSpacing: '-0.01em',
 };
 
+// Phase 9: close button 32×32 → 44×44. The dialog close is the
+// safety-net dismissal path (other paths: backdrop tap, Esc, drag-down
+// would need lib). A 32px target on the header right edge is the
+// classic "miss and dismiss the backdrop instead" risk.
 const closeBtnStyle = {
-  width: 32,
-  height: 32,
+  width: 44,
+  height: 44,
   borderRadius: 8,
   border: '1px solid var(--color-border-bright)',
   background: 'transparent',
   color: 'var(--color-text-muted)',
   cursor: 'pointer',
-  fontSize: 14,
+  fontSize: 16,
   lineHeight: 1,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
 };
 
 const sectionsScrollStyle = {
@@ -411,9 +425,11 @@ const gridStyle = {
   gap: 6,
 };
 
+// Phase 9: keep 44px floor; padding tight at 8/10 so the label has
+// room without the kbd hint overlapping at 320px viewport width.
 const toolGridBtnBase = {
   minHeight: 44,
-  padding: '8px 12px',
+  padding: '8px 10px',
   borderRadius: 6,
   cursor: 'pointer',
   textAlign: 'left',

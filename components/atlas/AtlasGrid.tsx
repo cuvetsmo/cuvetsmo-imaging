@@ -319,7 +319,9 @@ export function AtlasGrid({ entries }: { entries: AtlasEntry[] }) {
           {hasActiveFilters && (
             <button
               onClick={resetFilters}
-              className="text-[var(--color-tool-cyan)] hover:text-[#7DDCEF] underline underline-offset-2"
+              // Phase 9: text-button bumped to 44px floor inline-flex so
+              // tap targets in the filter footer all match the chips above.
+              className="text-[var(--color-tool-cyan)] hover:text-[#7DDCEF] underline underline-offset-2 inline-flex items-center min-h-[44px] sm:min-h-[28px] px-2 -mx-2"
             >
               clear filters
             </button>
@@ -404,8 +406,12 @@ function FilterRow({
               aria-pressed={isActive}
               aria-label={c.k === "all" ? c.label : `${c.label} (${count})`}
               className={[
-                // min-h ensures 44px tap target on mobile (per ux-audit checklist)
-                "inline-flex items-center gap-1.5 min-h-[36px] sm:min-h-[32px] px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors",
+                // Phase 9: comment claimed 44px but actual class was 36/32 —
+                // bumped to 44 mobile / 36 sm so the comment is finally
+                // true. Atlas filter chips wrap into multi-row flex on a
+                // phone — undersized chips next to each other are the
+                // worst-case mistap surface.
+                "inline-flex items-center gap-1.5 min-h-[44px] sm:min-h-[36px] px-3 py-2 rounded-md text-[12px] font-medium transition-colors",
                 "border",
                 isActive
                   ? "bg-[var(--color-tool-cyan)] text-[#06070A] border-[var(--color-tool-cyan)]"
@@ -483,7 +489,10 @@ function CredSegment({
       onClick={onClick}
       aria-pressed={active}
       className={[
-        "inline-flex items-center gap-1.5 min-h-[28px] px-2.5 py-1 rounded text-[11px] transition-colors border",
+        // Phase 9: CredSegment 28→44 floor on mobile, 32 on sm+ so the
+        // header split pill stays compact on desktop but touch-safe on
+        // a phone. The pill is the visual center of the atlas header.
+        "inline-flex items-center gap-1.5 min-h-[44px] sm:min-h-[32px] px-3 py-2 rounded text-[11px] transition-colors border",
         active
           ? activeBg
           : "border-transparent hover:bg-[var(--color-surface-3)]",

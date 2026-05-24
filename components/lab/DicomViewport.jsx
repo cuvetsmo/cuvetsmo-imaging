@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { RenderingEngine, Enums } from '@cornerstonejs/core';
+import { Enums } from '@cornerstonejs/core';
 import {
   ToolGroupManager,
   WindowLevelTool,
@@ -8,12 +8,9 @@ import {
   ZoomTool,
   LengthTool,
   AngleTool,
-  StackScrollTool,
   annotation,
   Enums as ToolEnums,
 } from '@cornerstonejs/tools';
-import dicomParser from 'dicom-parser';
-import { ensureCornerstoneInit, getDicomImageLoader } from '../../lib/dicom/cornerstone-init.js';
 import NorbergOverlay from './NorbergOverlay.jsx';
 import VHSOverlay from './VHSOverlay.jsx';
 import AIOverlay from './AIOverlay.jsx';
@@ -27,13 +24,13 @@ import {
   formatPresetToast,
 } from '../../lib/dicom/wl-presets';
 import {
-  TOUCH_SLICE_THRESHOLD_PX,
-  clampIndex,
   formatSlicePos,
   indexFromKey,
-  sliceDeltaFromTouch,
-  proportionalSliceIndex,
 } from '../../lib/dicom/stack-scroll';
+// Phase 9 (Agent ①) — engine/stack/sync extracted to three hooks.
+import { useDicomEngine, applySmartContrast } from '../../lib/dicom/hooks/use-dicom-engine.js';
+import { useStackScroll } from '../../lib/dicom/hooks/use-stack-scroll.js';
+import { useCompareSync } from '../../lib/dicom/hooks/use-compare-sync.js';
 
 // PRESETS = clinical W/L list (Bone · Soft · Lung · Auto) + DICOM reset.
 // Numeric values are HU-based standard radiology presets — see
@@ -42,40 +39,6 @@ import {
 // default; the textbook values can look very high-contrast on raw
 // DR pixel data, which is expected behavior.
 const PRESETS = [...WL_PRESETS, WL_PRESET_DICOM];
-
-// Sample the pixel histogram + set voiRange from P1–P99. Way more
-// reliable than the DICOM-tag default (which is often the full bit
-// range = washed out). Sampled (~20 k) not full-image, so it's cheap
-// even on 4k DR images.
-//
-// NOTE: callers that want the cyan preset ring to stay active MUST
-// gate this call with `isApplyingPresetRef.current = true` and reset
-// the flag in a `queueMicrotask` — `viewport.setProperties` fires
-// `VOI_MODIFIED` synchronously within the same task, so a microtask
-// boundary is the tightest valid suppression window.
-function applySmartContrast(viewport) {
-  try {
-    const img = viewport?.csImage;
-    if (!img?.getPixelData) return false;
-    const pixels = img.getPixelData();
-    const N = pixels.length;
-    if (N === 0) return false;
-    const sampleSize = Math.min(20000, N);
-    const stride = Math.max(1, Math.floor(N / sampleSize));
-    const samples = [];
-    for (let i = 0; i < N; i += stride) samples.push(pixels[i]);
-    if (samples.length < 10) return false;
-    samples.sort((a, b) => a - b);
-    const p1 = samples[Math.floor(samples.length * 0.01)];
-    const p99 = samples[Math.floor(samples.length * 0.99)];
-    if (p99 <= p1) return false;
-    viewport.setProperties({ voiRange: { lower: p1, upper: p99 } });
-    viewport.render();
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 // Tool registry — id → { class, label, sk (keyboard shortcut letter) }.
 // The id is what activeTool state holds; class.toolName is what
@@ -93,8 +56,6 @@ const TOOLS = {
   length: { cls: LengthTool,      label: '📏 Length',  short: '📏 M', sk: 'M' },
   angle:  { cls: AngleTool,       label: '📐 Angle',   short: '📐 G', sk: 'G' },
 };
-
-let engineSeq = 0;
 
 export default function DicomViewport({
   file,
@@ -168,18 +129,11 @@ export default function DicomViewport({
   // sync dispatcher checks `isApplyingPresetRef.current` first — if
   // false, presetId is forced to null regardless of this ref).
   const pendingPresetIdRef = useRef(null);
-  const [status, setStatus] = useState('init');
-  const [errorMsg, setErrorMsg] = useState('');
-  const [meta, setMeta] = useState(null);
   const [activeTool, setActiveTool] = useState('wl');
   // Current slice index (0-based) in stack mode. `setImageIdIndex` is
   // async, but we update React state synchronously on user input — the
   // STACK_NEW_IMAGE listener reconciles in case of double-fire / race.
   const [sliceIdx, setSliceIdx] = useState(0);
-  // Hoisted up here (was below, but the load + selectTool callbacks
-  // reference these setters; React Compiler flags use-before-declare
-  // when state hooks land further down the function body).
-  const [species, setSpecies] = useState('');
   // First-load nudge — small floating tip near the canvas that hints
   // the measurement workflow. Auto-fades after 6 s or on any tool
   // selection (other than the default W/L which is auto-active).
@@ -189,160 +143,35 @@ export default function DicomViewport({
   // the visible mobile toolbar can stay at 4 tools + a "More" entry
   // (no horizontal scroll for beginners).
   const [showMobileMore, setShowMobileMore] = useState(false);
+  // Active preset = which W/L preset button gets the cyan ring.
+  // `null` while smart-W/L initial compute is in flight or after the
+  // user has manually adjusted W/L via the WindowLevelTool drag.
+  // (Hoisted from below to be declared before the engine hook reads
+  // its setter — the engine effect calls setActivePreset('auto') after
+  // initial smart-contrast applies. The drift-clear handler later in
+  // the body uses the same setter.)
+  const [activePreset, setActivePreset] = useState(null);
 
-  useEffect(() => {
-    if (filesArray.length === 0) return;
-    let cancelled = false;
-    const seq = ++engineSeq;
-    const engineId = `lab-engine-${seq}`;
-    const viewportId = `lab-vp-${seq}`;
-    const toolGroupId = `lab-tg-${seq}`;
-    viewportIdRef.current = viewportId;
-    toolGroupIdRef.current = toolGroupId;
-
-    (async () => {
-      try {
-        setStatus('init');
-        await ensureCornerstoneInit();
-        if (cancelled || !elRef.current) return;
-
-        const loader = getDicomImageLoader();
-        // Phase 5 — register every file as an imageId so the StackViewport
-        // can scroll through all of them. For 1-file mode this is still a
-        // single-element array (Cornerstone's STACK viewport happily renders
-        // a 1-slice stack).
-        const imageIds = filesArray.map((f) => loader.wadouri.fileManager.add(f));
-
-        const engine = new RenderingEngine(engineId);
-        engineRef.current = engine;
-        engine.enableElement({
-          viewportId,
-          type: Enums.ViewportType.STACK,
-          element: elRef.current,
-        });
-        const viewport = engine.getViewport(viewportId);
-        await viewport.setStack(imageIds);
-        // Always start at the first slice. Cornerstone preserves the last
-        // index from any previous setStack on the same viewport (we destroy
-        // the engine in cleanup so this is mostly defensive).
-        setSliceIdx(0);
-
-        const tg = ToolGroupManager.createToolGroup(toolGroupId);
-        Object.values(TOOLS).forEach(({ cls }) => tg.addTool(cls.toolName));
-        // Phase 5 — stack scroll tool is added regardless of mode, but only
-        // bound to wheel input when we're actually in stack mode. Adding it
-        // unconditionally keeps the tool group shape stable across mode
-        // transitions if we add a toolbar toggle later.
-        tg.addTool(StackScrollTool.toolName);
-        tg.addViewport(viewportId, engineId);
-        // Bindings include explicit numTouchPoints so single-finger
-        // tap-and-drag on tablet/phone behaves the same as left-mouse-
-        // drag — same gesture pipes through Cornerstone's normalized
-        // pointer events. Pan also accepts 2-finger drag (the natural
-        // touch gesture). Zoom keeps Secondary mouse only; pinch on
-        // touch is suppressed by `touch-action: none` on the wrapper
-        // and re-enabled implicitly when the user selects Zoom in the
-        // toolbar (becomes single-tap-drag via the Primary binding).
-        tg.setToolActive(WindowLevelTool.toolName, {
-          bindings: [
-            { mouseButton: ToolEnums.MouseBindings.Primary },
-            { numTouchPoints: 1 },
-          ],
-        });
-        tg.setToolActive(PanTool.toolName, {
-          bindings: [
-            { mouseButton: ToolEnums.MouseBindings.Auxiliary },
-            { numTouchPoints: 2 },
-          ],
-        });
-        tg.setToolActive(ZoomTool.toolName, {
-          bindings: [{ mouseButton: ToolEnums.MouseBindings.Secondary }],
-        });
-        // Phase 5 — bind StackScroll to mouse wheel ONLY in stack mode.
-        // Mouse wheel in single mode = browser scroll, which is the expected
-        // behavior on a single-slice page (no slices to advance through).
-        // The tool itself has Touch in supportedInteractionTypes, but we
-        // handle touch ourselves via pointer events to coexist with the
-        // primary-tool single-finger gesture (W/L drag, Pan).
-        if (isStackMode) {
-          tg.setToolActive(StackScrollTool.toolName, {
-            bindings: [{ mouseButton: ToolEnums.MouseBindings.Wheel }],
-          });
-        }
-
-        viewport.render();
-
-        // Try smart auto-contrast as the default presentation. Falls
-        // back silently to the DICOM-tag default if csImage isn't
-        // ready yet (rare; happens with stack-loader race conditions).
-        // Gate the VOI_MODIFIED bounce — without the flag, the drift
-        // handler would null `activePreset` back to null in the same
-        // microtask we set it to 'auto'.
-        requestAnimationFrame(() => {
-          if (cancelled) return;
-          isApplyingPresetRef.current = true;
-          // AGENT-④ Phase 8 — tag the impending VOI_MODIFIED bounce
-          // with the preset id so the W/L sync dispatcher can mirror
-          // the cyan ring on the twin pane (when sync is on).
-          pendingPresetIdRef.current = 'auto';
-          try {
-            const ok = applySmartContrast(viewport);
-            // Mark Auto as the initial active preset only if it
-            // actually applied; on failure the DICOM-tag default
-            // wins and no preset is "active".
-            if (ok) setActivePreset('auto');
-          } finally {
-            queueMicrotask(() => {
-              isApplyingPresetRef.current = false;
-              pendingPresetIdRef.current = null;
-            });
-          }
-        });
-
-        if (cancelled) return;
-        const img = viewport.csImage || null;
-        const dims = img?.dimensions || [img?.width, img?.height];
-        // PixelSpacing for mm-calibrated measurements. Cornerstone reads
-        // it from the DICOM tag; we just surface it in the status line.
-        const spacing = img?.rowPixelSpacing || img?.columnPixelSpacing || null;
-        setMeta({
-          width: dims?.[0] ?? '?',
-          height: dims?.[1] ?? '?',
-          mmPerPx: spacing,
-        });
-        // Parse PatientSpeciesDescription (0010,2201) once, in parallel
-        // with the Cornerstone load. Used by VHS overlay to pick the
-        // right reference range (canine 8.5–10.5 vs feline 6.7–8.1).
-        // In stack mode we read the first file — species is a study-level
-        // attribute, so any instance carries the same value.
-        try {
-          if (primaryFile) {
-            const buf = await primaryFile.arrayBuffer();
-            const ds = dicomParser.parseDicom(new Uint8Array(buf));
-            const sp = ds.string('x00102201') || '';
-            if (!cancelled && sp) setSpecies(sp);
-          }
-        } catch { /* dicom-parser failed; species stays empty */ }
-        setStatus('ready');
-        setActiveTool('wl');
-      } catch (err) {
-        console.error('[DicomViewport] load error:', err);
-        if (!cancelled) {
-          setStatus('error');
-          setErrorMsg(err?.message || String(err));
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      try {
-        if (toolGroupIdRef.current) ToolGroupManager.destroyToolGroup(toolGroupIdRef.current);
-        engineRef.current?.destroy();
-      } catch { /* noop */ }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filesKey, isStackMode]);
+  // Phase 9 (Agent ①) — engine + viewport setup (extracted hook).
+  // Owns: Cornerstone init · RenderingEngine · StackViewport · ToolGroup ·
+  // default tool bindings · StackScroll wheel binding · smart-contrast
+  // auto W/L · PatientSpeciesDescription parse · cleanup on unmount.
+  const { status, errorMsg, meta, species } = useDicomEngine({
+    filesArray,
+    primaryFile,
+    filesKey,
+    isStackMode,
+    TOOLS,
+    elRef,
+    engineRef,
+    viewportIdRef,
+    toolGroupIdRef,
+    isApplyingPresetRef,
+    pendingPresetIdRef,
+    setSliceIdx,
+    setActiveTool,
+    setActivePreset,
+  });
 
   const getViewport = useCallback(() => {
     return engineRef.current?.getViewport(viewportIdRef.current);
@@ -384,17 +213,14 @@ export default function DicomViewport({
     }
   }, []);
 
-  // Active preset = which W/L preset button gets the cyan ring.
-  // `null` while smart-W/L initial compute is in flight or after the
-  // user has manually adjusted W/L via the WindowLevelTool drag.
-  const [activePreset, setActivePreset] = useState(null);
-  // (isApplyingPresetRef moved to the top of the component body.
-  // The longer rationale: gate the VOI_MODIFIED → setActivePreset(null)
-  // drift-clear for our OWN programmatic voiRange writes (preset apply ·
-  // smart auto · reset). Set true BEFORE the write, reset in a
-  // queueMicrotask so any synchronous VOI_MODIFIED bounce is gated and
-  // any genuine user-drag VOI events arriving in later microtasks fall
-  // through.)
+  // (activePreset state hoisted above so the engine hook receives
+  // its setter. isApplyingPresetRef moved to the top of the component
+  // body. The longer rationale: gate the VOI_MODIFIED →
+  // setActivePreset(null) drift-clear for our OWN programmatic voiRange
+  // writes (preset apply · smart auto · reset). Set true BEFORE the
+  // write, reset in a queueMicrotask so any synchronous VOI_MODIFIED
+  // bounce is gated and any genuine user-drag VOI events arriving in
+  // later microtasks fall through.)
   // Ephemeral toast at bottom-center — fades after ~1.2 s. Cleared by
   // ID so rapid preset taps replace the previous toast instead of
   // queueing up.
@@ -599,293 +425,28 @@ export default function DicomViewport({
   const navTools = ['wl', 'pan', 'zoom'];
   const measureTools = ['length', 'angle'];
 
-  // Camera-sync for 2-up compare. When LabView turns sync on, each
-  // viewport emits its own camera changes via window events and
-  // applies remote ones (skipping its own ID to avoid feedback).
-  // The `isApplying` flag suppresses the bounce — without it, an
-  // incoming setCamera() would trigger CAMERA_MODIFIED locally which
-  // would emit again → infinite loop. requestAnimationFrame resets
-  // the flag AFTER the local CAMERA_MODIFIED bounce arrives.
-  //
-  // Phase 6 (Agent ⓐ) — extended to also sync STACK_NEW_IMAGE (slice
-  // index) when both panes are in stack mode. Two separate
-  // `isApplying` flags so a slice-change doesn't accidentally gate
-  // the user's NEXT camera adjustment (and vice-versa) — the bounces
-  // are independent events on the same element.
-  //
-  // syncGroupId scopes the window events so multiple compare pairs
-  // could coexist on the page. The detail payload carries `totalSlices`
-  // so the receiver can map proportionally when stack lengths differ
-  // (e.g. compare a 36-slice C-spine to a 40-slice repeat).
-  //
-  // AGENT-④ Phase 8 — slice + camera now gated INDEPENDENTLY via the
-  // per-axis `syncSlice` / `syncCamera` props (defaults preserve Phase 6
-  // behavior). `syncEnabled` stays the master gate; a per-axis flag of
-  // false just means the corresponding listener pair is not attached, so
-  // events from the twin pane on that axis are ignored on this side AND
-  // we don't dispatch our own. Both directions are necessary — otherwise
-  // a one-sided opt-out would still receive incoming updates on the off
-  // axis. (W/L sync lives in its own effect just below — separate `isApplying`
-  // closure so it can't gate slice/camera bounces and vice-versa.)
-  useEffect(() => {
-    if (!syncEnabled || status !== 'ready') return;
-    if (!syncSlice && !syncCamera) return; // nothing to attach
-    const element = elRef.current;
-    if (!element) return;
-    const myId = viewportIdRef.current;
-    let isApplyingCamera = false;
-    let isApplyingSlice = false;
-    // Resolve the sync channel name once. 'default' keeps the legacy
-    // event name so older callers (Phase 5 2-up compare) still get
-    // delivered. Any other group ID gets a per-group suffix.
-    const cameraEvent = syncGroupId === 'default'
-      ? 'vmx-lab-sync-camera'
-      : `vmx-lab-sync-camera:${syncGroupId}`;
-    const sliceEvent = syncGroupId === 'default'
-      ? 'vmx-lab-sync-slice'
-      : `vmx-lab-sync-slice:${syncGroupId}`;
-
-    const onCameraChange = () => {
-      if (isApplyingCamera) return;
-      const vp = engineRef.current?.getViewport(myId);
-      if (!vp) return;
-      try {
-        const cam = vp.getCamera();
-        window.dispatchEvent(new CustomEvent(cameraEvent, {
-          detail: { sourceId: myId, syncGroupId, camera: cam },
-        }));
-      } catch { /* viewport torn down mid-event */ }
-    };
-
-    const onRemoteCamera = (evt) => {
-      if (!evt?.detail || evt.detail.sourceId === myId) return;
-      if (evt.detail.syncGroupId && evt.detail.syncGroupId !== syncGroupId) return;
-      const vp = engineRef.current?.getViewport(myId);
-      if (!vp) return;
-      try {
-        isApplyingCamera = true;
-        vp.setCamera(evt.detail.camera);
-        vp.render();
-        requestAnimationFrame(() => { isApplyingCamera = false; });
-      } catch (err) {
-        console.error('[viewport-sync] camera apply error:', err);
-        isApplyingCamera = false;
-      }
-    };
-
-    // Slice-index sync — only active when this pane is in stack mode.
-    // STACK_NEW_IMAGE fires on every visible-slice change (wheel · arrows
-    // · touch swipe · programmatic). We re-dispatch as a window event;
-    // the twin pane catches it and calls setImageIdIndex(mapped).
-    //
-    // isApplyingSlice gates the bounce: when we call setImageIdIndex
-    // here, STACK_NEW_IMAGE fires locally, and without the flag we'd
-    // re-dispatch a window event that the twin pane already sent us →
-    // ping-pong loop. requestAnimationFrame resets after the local
-    // bounce arrives.
-    const onLocalNewImage = () => {
-      if (!isStackMode) return;
-      if (isApplyingSlice) return;
-      const vp = engineRef.current?.getViewport(myId);
-      if (!vp || typeof vp.getCurrentImageIdIndex !== 'function') return;
-      try {
-        const i = vp.getCurrentImageIdIndex();
-        const total = typeof vp.getNumberOfSlices === 'function'
-          ? vp.getNumberOfSlices()
-          : sliceCount;
-        window.dispatchEvent(new CustomEvent(sliceEvent, {
-          detail: { sourceId: myId, syncGroupId, sliceIdx: i, totalSlices: total },
-        }));
-      } catch { /* viewport torn down mid-event */ }
-    };
-
-    const onRemoteSlice = (evt) => {
-      if (!evt?.detail || evt.detail.sourceId === myId) return;
-      if (evt.detail.syncGroupId && evt.detail.syncGroupId !== syncGroupId) return;
-      // If we're not in stack mode, ignore — there's nothing to scroll.
-      if (!isStackMode) return;
-      const vp = engineRef.current?.getViewport(myId);
-      if (!vp || typeof vp.setImageIdIndex !== 'function') return;
-      try {
-        const myTotal = typeof vp.getNumberOfSlices === 'function'
-          ? vp.getNumberOfSlices()
-          : sliceCount;
-        const target = proportionalSliceIndex(
-          evt.detail.sliceIdx,
-          evt.detail.totalSlices,
-          myTotal,
-        );
-        const cur = typeof vp.getCurrentImageIdIndex === 'function'
-          ? vp.getCurrentImageIdIndex()
-          : -1;
-        if (target === cur) return; // already there — skip the bounce entirely
-        isApplyingSlice = true;
-        // Eager React-state update so the indicator pill doesn't lag.
-        setSliceIdx(target);
-        vp.setImageIdIndex(target);
-        // setImageIdIndex is async — the STACK_NEW_IMAGE bounce arrives
-        // on a later task. rAF puts us comfortably past it for typical
-        // load latencies; if the decode is slow the flag may flip back
-        // before STACK_NEW_IMAGE fires, but the early-return on
-        // (target === cur) above catches that case so no infinite loop.
-        requestAnimationFrame(() => { isApplyingSlice = false; });
-      } catch (err) {
-        console.error('[viewport-sync] slice apply error:', err);
-        isApplyingSlice = false;
-      }
-    };
-
-    if (syncCamera) {
-      element.addEventListener(Enums.Events.CAMERA_MODIFIED, onCameraChange);
-      window.addEventListener(cameraEvent, onRemoteCamera);
-    }
-    if (syncSlice) {
-      element.addEventListener(Enums.Events.STACK_NEW_IMAGE, onLocalNewImage);
-      window.addEventListener(sliceEvent, onRemoteSlice);
-    }
-    return () => {
-      if (syncCamera) {
-        element.removeEventListener(Enums.Events.CAMERA_MODIFIED, onCameraChange);
-        window.removeEventListener(cameraEvent, onRemoteCamera);
-      }
-      if (syncSlice) {
-        element.removeEventListener(Enums.Events.STACK_NEW_IMAGE, onLocalNewImage);
-        window.removeEventListener(sliceEvent, onRemoteSlice);
-      }
-    };
-  }, [syncEnabled, syncSlice, syncCamera, status, syncGroupId, isStackMode, sliceCount]);
-
-  // AGENT-④ Phase 8 — W/L cross-pane sync (default OFF · opt-in).
-  //
-  // Mirrors the Phase 6 slice + camera pattern: subscribe to the local
-  // VOI_MODIFIED event, dispatch a window event with the new voiRange so
-  // the twin pane can apply the same lower/upper bounds via
-  // `viewport.setProperties({ voiRange })`.
-  //
-  // Design notes:
-  //   • Default OFF — clinicians often want different W/L per pane
-  //     (bone left vs lung right on a normal-vs-cardiomegaly compare).
-  //     The toggle in LabHome's chrome popover is the opt-in surface.
-  //   • Separate `isApplyingWL` closure flag — DO NOT reuse the
-  //     slice/camera flags. Each axis bounces independently on its own
-  //     event; mixing the flags would let a slice change accidentally
-  //     gate the next W/L drag (or vice-versa).
-  //   • Coexists with Phase 5's `isApplyingPresetRef` — that ref gates
-  //     the cyan-ring drift-clear for our OWN programmatic writes. When
-  //     a remote VOI lands here, we set the preset ref true around the
-  //     setProperties call so the remote's preset (if any) survives the
-  //     local VOI_MODIFIED bounce instead of being cleared.
-  //   • Detail payload includes an optional `presetId` — when the
-  //     source pane just applied a preset, we propagate the id so the
-  //     receiver can mirror the cyan ring (otherwise the receiver would
-  //     get the right voiRange but show no active preset, which would
-  //     visually lie). When the source is a user drag, presetId is null
-  //     and the receiver's ring stays cleared/unchanged.
-  useEffect(() => {
-    if (!syncEnabled || !syncWL || status !== 'ready') return;
-    const element = elRef.current;
-    if (!element) return;
-    const myId = viewportIdRef.current;
-    let isApplyingWL = false;
-    const wlEvent = syncGroupId === 'default'
-      ? 'vmx-lab-sync-wl'
-      : `vmx-lab-sync-wl:${syncGroupId}`;
-
-    const onLocalVoi = (evt) => {
-      // Our own programmatic apply just below — bounce expected, skip.
-      if (isApplyingWL) return;
-      // Phase 5's preset/reset gate — when WE applied a preset locally,
-      // its synchronous VOI_MODIFIED bounce comes through here too. We
-      // STILL want to propagate that preset to the twin (the spec says
-      // "preset on left → right gets same preset" when sync ON). The
-      // preset-ref is true only inside applyPreset/resetView/initial
-      // smart-contrast — see the presetId snapshot below.
-      const vp = engineRef.current?.getViewport(myId);
-      if (!vp) return;
-      // Prefer the event's range payload (Cornerstone gives it to us
-      // directly); fall back to reading off the viewport for robustness.
-      let voiRange = evt?.detail?.range || null;
-      if (!voiRange) {
-        try {
-          const props = typeof vp.getProperties === 'function' ? vp.getProperties() : null;
-          if (props?.voiRange) voiRange = props.voiRange;
-        } catch { /* viewport torn down */ }
-      }
-      if (!voiRange) return;
-      // Snapshot the preset id at dispatch time. We CANNOT just read
-      // React's `activePreset` state via closure — by the time this
-      // listener runs, `setActivePreset(preset.id)` may have scheduled
-      // an update but the closure still sees the PREVIOUS render's
-      // value. Use `pendingPresetIdRef.current`, which applyPreset /
-      // resetView / initial-auto set SYNCHRONOUSLY right before
-      // calling setProperties. When the gate is shut
-      // (`isApplyingPresetRef.current === false`), the source is a
-      // user drag — force presetId to null regardless of what's in
-      // the ref (stale from a prior preset apply that's already over).
-      const presetId = isApplyingPresetRef.current
-        ? pendingPresetIdRef.current
-        : null;
-      try {
-        window.dispatchEvent(new CustomEvent(wlEvent, {
-          detail: { sourceId: myId, syncGroupId, voiRange, presetId },
-        }));
-      } catch { /* dispatch failed; ignore */ }
-    };
-
-    const onRemoteVoi = (evt) => {
-      if (!evt?.detail || evt.detail.sourceId === myId) return;
-      if (evt.detail.syncGroupId && evt.detail.syncGroupId !== syncGroupId) return;
-      const vp = engineRef.current?.getViewport(myId);
-      if (!vp || typeof vp.setProperties !== 'function') return;
-      const { voiRange, presetId } = evt.detail;
-      if (!voiRange) return;
-      try {
-        // Gate BOTH bounces:
-        //   • isApplyingWL = true so our onLocalVoi sees this as our
-        //     own write and skips re-dispatching (would create a loop).
-        //   • isApplyingPresetRef.current = true so the Phase 5
-        //     drift-clear handler doesn't immediately null activePreset
-        //     on the synchronous VOI_MODIFIED bounce.
-        isApplyingWL = true;
-        isApplyingPresetRef.current = true;
-        vp.setProperties({ voiRange });
-        vp.render();
-        // Mirror the cyan ring when the source explicitly told us so.
-        // For drags (presetId === null) we leave activePreset alone — the
-        // local Phase 5 drift handler is suppressed by isApplyingPresetRef
-        // above, so the ring won't get cleared by the apply itself; if
-        // there was no ring to begin with, nothing changes.
-        if (presetId) {
-          setActivePreset((cur) => (cur === presetId ? cur : presetId));
-        } else {
-          // User drag on the source pane — clear local ring (the W/L is
-          // now drifted by definition). Matches Phase 5 drift semantics.
-          setActivePreset((cur) => (cur === null ? cur : null));
-        }
-        // Both flags reset on the next animation frame, after the
-        // synchronous VOI_MODIFIED bounce has arrived + been ignored.
-        requestAnimationFrame(() => {
-          isApplyingWL = false;
-          isApplyingPresetRef.current = false;
-        });
-      } catch (err) {
-        console.error('[viewport-sync] wl apply error:', err);
-        isApplyingWL = false;
-        isApplyingPresetRef.current = false;
-      }
-    };
-
-    element.addEventListener(Enums.Events.VOI_MODIFIED, onLocalVoi);
-    window.addEventListener(wlEvent, onRemoteVoi);
-    return () => {
-      element.removeEventListener(Enums.Events.VOI_MODIFIED, onLocalVoi);
-      window.removeEventListener(wlEvent, onRemoteVoi);
-    };
-    // No React state read in closure — preset id is sourced from
-    // pendingPresetIdRef (synchronous, not React state) so we don't
-    // need to re-subscribe on every render. filesKey covers the
-    // viewport-replaced case.
-  }, [syncEnabled, syncWL, status, syncGroupId, filesKey]);
+  // Phase 9 (Agent ①) — cross-pane sync (extracted hook).
+  // Owns Phase 6 slice + camera sync AND Phase 8 W/L sync. Each axis
+  // has its own closure-scoped `isApplying` flag so a bounce on one
+  // axis can't gate user input on a different axis.
+  useCompareSync({
+    elRef,
+    engineRef,
+    viewportIdRef,
+    syncEnabled,
+    syncGroupId,
+    syncSlice,
+    syncCamera,
+    syncWL,
+    status,
+    isStackMode,
+    sliceCount,
+    filesKey,
+    isApplyingPresetRef,
+    pendingPresetIdRef,
+    setSliceIdx,
+    setActivePreset,
+  });
 
   // W/L drift detection — when the user drags W/L via the
   // WindowLevelTool after a preset is applied, the cyan ring should
@@ -925,116 +486,23 @@ export default function DicomViewport({
     };
   }, [status, filesKey]);
 
-  // Phase 5 — programmatic slice navigation. `setImageIdIndex` is async
-  // (Cornerstone fetches+decodes the next imageId), but we eagerly update
-  // React state so the indicator UI feels instant. The STACK_NEW_IMAGE
-  // listener below reconciles in case Cornerstone clamped or rejected the
-  // index (e.g. mid-load).
-  const goToSlice = useCallback((nextIdx) => {
-    const engine = engineRef.current;
-    if (!engine) return;
-    const viewport = engine.getViewport(viewportIdRef.current);
-    if (!viewport || typeof viewport.setImageIdIndex !== 'function') return;
-    const total = typeof viewport.getNumberOfSlices === 'function'
-      ? viewport.getNumberOfSlices()
-      : sliceCount;
-    const clamped = clampIndex(nextIdx, total);
-    if (clamped < 0) return;
-    setSliceIdx(clamped);
-    // setImageIdIndex returns a promise; fire-and-forget is fine — render
-    // happens automatically once the image is decoded. Failures here are
-    // mostly "viewport unmounted mid-flight" which is harmless.
-    try { viewport.setImageIdIndex(clamped); } catch { /* noop */ }
-  }, [sliceCount]);
-
-  // Keep React state in sync with Cornerstone's internal index. Cornerstone
-  // fires STACK_NEW_IMAGE every time the visible slice changes, regardless
-  // of source (our keyboard handler, the StackScrollTool wheel binding, or
-  // our touch swipe). One listener catches all three input paths.
-  useEffect(() => {
-    if (status !== 'ready' || !isStackMode) return;
-    const element = elRef.current;
-    if (!element) return;
-    const onNewImage = () => {
-      const vp = engineRef.current?.getViewport(viewportIdRef.current);
-      if (!vp || typeof vp.getCurrentImageIdIndex !== 'function') return;
-      try {
-        const i = vp.getCurrentImageIdIndex();
-        setSliceIdx((cur) => (cur === i ? cur : i));
-      } catch { /* viewport torn down */ }
-    };
-    element.addEventListener(Enums.Events.STACK_NEW_IMAGE, onNewImage);
-    return () => {
-      element.removeEventListener(Enums.Events.STACK_NEW_IMAGE, onNewImage);
-    };
-  }, [status, isStackMode, filesKey]);
-
-  // Touch swipe → slice scroll. Vertical pointer drag on the canvas
-  // becomes slice navigation. Only active in stack mode AND when the
-  // current primary tool is one whose drag we can safely intercept —
-  // for W/L drag we yield (clinicians need that gesture), but for
-  // any non-drag tool (length/angle clicks, pan-via-aux, zoom-via-secondary)
-  // single-finger swipe works. Threshold = 18 px per slice.
-  //
-  // Implementation: use pointer events instead of touch events so we
-  // get the same path on mouse + finger + pen. Cornerstone's own touch
-  // bindings (numTouchPoints: 1 on the primary tool) compete for the
-  // same gesture though — we ONLY take over when activeTool is `null`,
-  // `pan`, `zoom` (right-button), or measurement tools that use click
-  // not drag. For 'wl' (default) and 'norberg'/'vhs' overlays we yield.
-  const stackSwipeRef = useRef({ active: false, startY: 0, accumY: 0 });
-  useEffect(() => {
-    if (status !== 'ready' || !isStackMode) return;
-    const element = elRef.current;
-    if (!element) return;
-    // Tools whose drag we MUST yield (they use drag for their primary
-    // interaction — W/L drag adjusts window/level, Pan drag pans, Length/
-    // Angle drag draws the measurement line). For those, we don't intercept
-    // pointer-move; the user can press Z first to free up the gesture.
-    // Norberg/VHS use click placement (no drag), so they're safe to scroll.
-    const yieldDragToTool = (tool) =>
-      tool === 'wl' || tool === 'pan' || tool === 'length' || tool === 'angle';
-
-    const onDown = (e) => {
-      if (yieldDragToTool(activeTool)) return;
-      // Multi-touch (pinch zoom) — yield to Cornerstone.
-      if (e.pointerType === 'touch' && e.isPrimary === false) return;
-      stackSwipeRef.current = { active: true, startY: e.clientY, accumY: 0 };
-    };
-    const onMove = (e) => {
-      const s = stackSwipeRef.current;
-      if (!s.active) return;
-      const dy = e.clientY - s.startY - s.accumY;
-      const step = sliceDeltaFromTouch(dy);
-      if (step !== 0) {
-        // Pull current index off the viewport (not React state — React
-        // state can lag a frame and we'd double-step). Falls back to
-        // sliceIdx if the viewport accessor isn't ready.
-        const vp = engineRef.current?.getViewport(viewportIdRef.current);
-        const curIdx = vp && typeof vp.getCurrentImageIdIndex === 'function'
-          ? vp.getCurrentImageIdIndex()
-          : sliceIdx;
-        goToSlice(curIdx + step);
-        s.accumY += step * TOUCH_SLICE_THRESHOLD_PX;
-      }
-    };
-    const onUp = () => {
-      stackSwipeRef.current = { active: false, startY: 0, accumY: 0 };
-    };
-
-    element.addEventListener('pointerdown', onDown);
-    element.addEventListener('pointermove', onMove);
-    element.addEventListener('pointerup', onUp);
-    element.addEventListener('pointercancel', onUp);
-    element.addEventListener('pointerleave', onUp);
-    return () => {
-      element.removeEventListener('pointerdown', onDown);
-      element.removeEventListener('pointermove', onMove);
-      element.removeEventListener('pointerup', onUp);
-      element.removeEventListener('pointercancel', onUp);
-      element.removeEventListener('pointerleave', onUp);
-    };
-  }, [status, isStackMode, activeTool, goToSlice, sliceIdx]);
+  // Phase 9 (Agent ①) — stack-scroll surface (extracted hook).
+  // Owns: `goToSlice` callback · STACK_NEW_IMAGE reconciliation listener ·
+  // touch-swipe pointer-event handler. Keyboard navigation for stack
+  // scroll stays inline in the broader keydown handler below because it
+  // shares a listener with the tool/preset/help key map.
+  const { goToSlice } = useStackScroll({
+    elRef,
+    engineRef,
+    viewportIdRef,
+    status,
+    isStackMode,
+    sliceCount,
+    filesKey,
+    activeTool,
+    sliceIdx,
+    setSliceIdx,
+  });
 
   // Keyboard shortcuts. Bound at the window level but skip when the
   // user is typing in a form input (so other views aren't hijacked

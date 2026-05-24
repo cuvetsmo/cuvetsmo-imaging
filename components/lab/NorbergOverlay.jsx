@@ -668,13 +668,21 @@ const mobileSheetCollapsedStyle = {
   boxShadow: '0 -2px 8px rgba(0,0,0,0.25)',
 };
 
+// Phase 9: padding 4px→10px V + minHeight: 44 to meet WCAG-AAA touch
+// target. Previously the result-card action row (Undo / Reset / JSON /
+// Save) rendered at ~24px tall — easy to mis-tap, especially after a
+// 4-point measurement when the student's finger is hovering nearby.
 const resetBtnStyle = {
   marginTop: 8,
-  padding: '4px 10px',
+  padding: '10px 14px',
+  minHeight: 44,
   background: '#444',
   color: '#fff',
   border: '1px solid #777',
   borderRadius: 4,
   cursor: 'pointer',
-  fontSize: '0.75rem',
+  fontSize: '0.78rem',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
 };

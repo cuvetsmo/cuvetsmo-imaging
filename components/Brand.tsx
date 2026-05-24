@@ -31,21 +31,27 @@ export function SiteHeader() {
         {/* Nav: 5 items at 375px overflows the viewport when gap+padding
             match the desktop layout, so we tighten both below sm. Each
             link drops to px-1 + text-[13px] on phones and back to the
-            roomier desktop look at sm+. */}
+            roomier desktop look at sm+.
+            Phase 9 (mobile UX): each Link gets min-h-[44px] inline-flex
+            so it satisfies WCAG-AAA touch-target floor without inflating
+            the visible row height (the existing parent gap absorbs the
+            extra padding on phones). On 320px the 5 items pack tight
+            (~270px including gaps + logo) — verified by sum of widths,
+            no horizontal scroll. */}
         <nav className="flex items-center gap-0.5 sm:gap-3 text-[13px] sm:text-sm">
-          <Link href="/cases" className="px-1 sm:px-2 py-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
+          <Link href="/cases" className="px-1 sm:px-2 py-1.5 min-h-[44px] inline-flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
             Cases
           </Link>
-          <Link href="/review" className="px-1 sm:px-2 py-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
+          <Link href="/review" className="px-1 sm:px-2 py-1.5 min-h-[44px] inline-flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
             Review
           </Link>
-          <Link href="/atlas" className="px-1 sm:px-2 py-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
+          <Link href="/atlas" className="px-1 sm:px-2 py-1.5 min-h-[44px] inline-flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
             Atlas
           </Link>
-          <Link href="/occlusion" className="px-1 sm:px-2 py-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
+          <Link href="/occlusion" className="px-1 sm:px-2 py-1.5 min-h-[44px] inline-flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
             Occlusion
           </Link>
-          <Link href="/about" className="px-1 sm:px-2 py-1.5 text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
+          <Link href="/about" className="px-1 sm:px-2 py-1.5 min-h-[44px] inline-flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
             About
           </Link>
         </nav>

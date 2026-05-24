@@ -415,17 +415,20 @@ const patientIdStyle = {
   letterSpacing: 0.2,
 };
 
+// Phase 9: trash bumped 28×28 → 44×44. The icon stays visually small
+// (0.85rem) but the hit area now meets WCAG-AAA. Padding is intentionally
+// asymmetric so the icon stays optically centered after the bump.
 const trashBtnStyle = {
   background: 'transparent',
   border: '1px solid var(--color-border)',
   color: 'var(--color-text-muted)',
   borderRadius: 6,
-  padding: '3px 8px',
+  padding: '10px 12px',
   fontSize: '0.85rem',
   lineHeight: 1,
   cursor: 'pointer',
-  minHeight: 28,
-  minWidth: 28,
+  minHeight: 44,
+  minWidth: 44,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -472,6 +475,10 @@ const seriesRowWrapStyle = {
   paddingTop: 6,
 };
 
+// Phase 9: series disclosure row bumped to 44px floor (was 32).
+// These rows are wide-but-short — a missed tap collapses/expands the
+// wrong series. The chevron + label keep their visual weight; only
+// padding grows.
 const seriesRowBtnStyle = {
   display: 'flex',
   alignItems: 'center',
@@ -479,13 +486,13 @@ const seriesRowBtnStyle = {
   width: '100%',
   background: 'transparent',
   border: 'none',
-  padding: '6px 4px',
+  padding: '10px 6px',
   cursor: 'pointer',
   color: 'var(--color-text)',
   textAlign: 'left',
   fontSize: '0.82rem',
   borderRadius: 6,
-  minHeight: 32,
+  minHeight: 44,
 };
 
 const seriesRowLabelStyle = {
@@ -525,6 +532,9 @@ const instanceItemStyle = {
   margin: 0,
 };
 
+// Phase 9: per-instance row bumped 28→44 floor. These rows render
+// inside a series disclosure list — at 28 they were almost touching
+// on a phone, easy to tap the wrong instance.
 const instanceBtnStyle = {
   display: 'flex',
   alignItems: 'center',
@@ -532,14 +542,14 @@ const instanceBtnStyle = {
   width: '100%',
   background: 'transparent',
   border: '1px solid transparent',
-  padding: '5px 8px',
+  padding: '10px 8px',
   cursor: 'pointer',
   color: 'var(--color-text-muted)',
   textAlign: 'left',
-  fontSize: '0.74rem',
+  fontSize: '0.78rem',
   fontFamily: 'var(--font-mono, ui-monospace, monospace)',
   borderRadius: 6,
-  minHeight: 28,
+  minHeight: 44,
   transition: 'border-color 140ms, color 140ms, background-color 140ms',
 };
 
@@ -625,6 +635,8 @@ const thumbGenLabelStyle = {
   textTransform: 'uppercase',
 };
 
+// Phase 9: primary CTA bumped 36→44 floor with 12px V padding so the
+// "Open study" footer is the unambiguous tap target on a mobile card.
 const openAllBtnStyle = {
   display: 'inline-flex',
   alignItems: 'center',
@@ -632,7 +644,7 @@ const openAllBtnStyle = {
   gap: 4,
   width: '100%',
   marginTop: 8,
-  padding: '9px 12px',
+  padding: '12px 14px',
   borderRadius: 8,
   background: 'var(--color-tool-cyan)',
   color: '#06070A',
@@ -641,6 +653,6 @@ const openAllBtnStyle = {
   fontWeight: 600,
   letterSpacing: '-0.005em',
   cursor: 'pointer',
-  minHeight: 36,
+  minHeight: 44,
   transition: 'background-color 140ms',
 };

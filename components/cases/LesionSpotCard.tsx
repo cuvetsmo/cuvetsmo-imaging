@@ -472,7 +472,10 @@ export function LesionSpotCard({
               <button
                 type="button"
                 onClick={clearBox}
-                className="text-[11px] font-mono uppercase tracking-wider text-[var(--color-text-faint)] hover:text-[var(--color-tool-violet)] transition-colors"
+                // Phase 9: 44px floor + negative-margin trick so the small
+                // text affordance remains tappable on mobile without
+                // visually growing.
+                className="inline-flex items-center min-h-[44px] px-2 -mx-2 text-[11px] font-mono uppercase tracking-wider text-[var(--color-text-faint)] hover:text-[var(--color-tool-violet)] transition-colors"
               >
                 Clear box
               </button>
@@ -506,7 +509,8 @@ export function LesionSpotCard({
           <button
             type="button"
             onClick={onExit}
-            className="text-[11px] sm:text-xs font-mono uppercase tracking-wider text-[var(--color-text-faint)] hover:text-[var(--color-tool-cyan)] transition-colors"
+            // Phase 9: text-link bumped to 44px floor.
+            className="inline-flex items-center min-h-[44px] px-2 -mx-2 text-[11px] sm:text-xs font-mono uppercase tracking-wider text-[var(--color-text-faint)] hover:text-[var(--color-tool-cyan)] transition-colors"
             title="Skip the spotting step and go back to the compare view"
           >
             Skip spotting · back to compare →

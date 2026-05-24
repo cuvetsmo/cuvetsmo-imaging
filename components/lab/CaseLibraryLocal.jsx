@@ -563,9 +563,12 @@ const emptyStyle = {
   color: 'var(--color-text-muted)',
 };
 
+// Phase 9: minmax floor lowered 280→260 so a 320px viewport fits one
+// card without horizontal scroll (320 - 16*2 page padding = 288px
+// usable; the old 280 was tight after 1px borders rendered).
 const gridStyle = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
   gap: 12,
 };
 
@@ -610,25 +613,34 @@ const searchIconStyle = {
   lineHeight: 1,
 };
 
+// Phase 9: search field min-height 36→44 so it matches WCAG touch
+// target and avoids the iOS Safari "auto-zoom on small text inputs"
+// trap (the 0.88rem ≈ 14px font would trigger zoom; bump to 16px to
+// disable it on iPhone — fixes the mobile typing UX without adding a
+// `viewport user-scalable=no` hack).
 const searchInputStyle = {
   width: '100%',
-  minHeight: 36,
-  padding: '6px 32px 6px 32px',
+  minHeight: 44,
+  // padding-right 52 makes room for the bumped-up 44px search-clear X
+  // (right:4 + width:44 = occupies right edge to 48px). Without this
+  // bump, typed text would slide under the X.
+  padding: '10px 52px 10px 36px',
   background: 'var(--color-surface-2)',
   color: 'var(--color-text)',
   border: '1px solid var(--color-border-bright)',
   borderRadius: 8,
-  fontSize: '0.88rem',
+  fontSize: '16px', // iOS zoom prevention (≥16px disables auto-zoom on focus)
   outline: 'none',
-  // focus ring done via :focus-within if needed — here just a subtle border swap
-  // via :focus inline workaround skipped; CSS variable focus styles in globals.css if added later
 };
 
+// Phase 9: 24→44 floor. The clear-X used to be a 24px micro-target
+// inside the search field — easy to miss with a thumb, especially
+// near the field edge where the field's own focus catcher competes.
 const searchClearBtnStyle = {
   position: 'absolute',
-  right: 6,
-  width: 24,
-  height: 24,
+  right: 4,
+  width: 44,
+  height: 44,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -641,8 +653,9 @@ const searchClearBtnStyle = {
   padding: 0,
 };
 
+// Phase 9: clear-all 32→44 floor.
 const clearAllBtnStyle = {
-  padding: '7px 12px',
+  padding: '10px 14px',
   background: 'transparent',
   color: 'var(--color-tool-cyan)',
   border: '1px solid var(--color-border-tool)',
@@ -651,7 +664,10 @@ const clearAllBtnStyle = {
   fontWeight: 500,
   cursor: 'pointer',
   whiteSpace: 'nowrap',
-  minHeight: 32,
+  minHeight: 44,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
 };
 
 const chipRowWrapStyle = {
@@ -683,8 +699,13 @@ const chipRowStyle = {
   minWidth: 0,
 };
 
+// Phase 9: filter chips 32→44 floor. These are the primary mobile
+// filter primitives — sitting in flex-wrap rows on a phone, a missed
+// tap flips the wrong facet and shuffles the case grid below. 44px
+// also gives enough vertical padding so chips don't visually collide
+// with the dashed row separator at narrow widths.
 const chipBtnStyle = {
-  padding: '6px 12px',
+  padding: '10px 14px',
   background: 'var(--color-surface-2)',
   color: 'var(--color-text-muted)',
   border: '1px solid var(--color-border-bright)',
@@ -693,7 +714,7 @@ const chipBtnStyle = {
   fontSize: '0.8rem',
   fontWeight: 500,
   whiteSpace: 'nowrap',
-  minHeight: 32,
+  minHeight: 44,
   display: 'inline-flex',
   alignItems: 'center',
   transition: 'border-color 140ms, color 140ms, background-color 140ms',
@@ -772,6 +793,7 @@ const codeStyle = {
   fontSize: '0.92em',
 };
 
+// Phase 9: case-card CTA 32 (effective)→44 floor.
 const openCaseBtnStyle = {
   display: 'inline-flex',
   alignItems: 'center',
@@ -779,7 +801,8 @@ const openCaseBtnStyle = {
   gap: 4,
   width: '100%',
   marginTop: 'auto',
-  padding: '9px 12px',
+  padding: '12px 14px',
+  minHeight: 44,
   borderRadius: 8,
   background: 'var(--color-tool-cyan)',
   color: '#06070A',

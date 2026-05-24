@@ -78,8 +78,12 @@ function DeckCard({ deck, onOpen, onDelete }) {
             {(deck.masks?.length || 0)} กล่อง · {formatThaiDate(deck.createdAt)}
           </div>
         </div>
+        {/* Phase 9: 36→44 floor on the deck-trash. .vmx-btn-sm now
+            enforces 44 too (globals.css), but we set explicit min
+            dimensions inline because vmx-btn-sm is shared and the
+            globally-bumped value still wins. */}
         <button type="button" className="vmx-btn vmx-btn-ghost vmx-btn-sm"
-                style={{ minHeight: 36, minWidth: 36, padding: '0 8px' }}
+                style={{ minHeight: 44, minWidth: 44, padding: '0 10px' }}
                 onClick={(e) => { e.stopPropagation(); onDelete(deck); }}
                 aria-label={`ลบ ${deck.name}`}
                 title="ลบ deck">🗑</button>

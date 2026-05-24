@@ -152,7 +152,11 @@ export function RecallInputCard({
                 role="radio"
                 aria-checked={confidence === n}
                 onClick={() => onConfidenceChange(n)}
-                className={`relative h-9 rounded-md border text-xs font-mono transition-all ${
+                // Phase 9: h-9 (36px) → h-11 (44px) so the 5-segment
+                // confidence picker meets WCAG-AAA touch floor. The pill
+                // grid spreads to use full width on mobile so each cell
+                // is ~56-60px wide × 44px tall — visibly tappable.
+                className={`relative h-11 rounded-md border text-xs font-mono transition-all ${
                   active
                     ? 'border-[var(--color-tool-cyan)] bg-[rgba(90,204,230,0.12)] text-[var(--color-tool-cyan)]'
                     : 'border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text-faint)] hover:border-[var(--color-border-bright)] hover:text-[var(--color-text-muted)]'
