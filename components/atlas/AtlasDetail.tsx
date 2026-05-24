@@ -74,13 +74,20 @@ export function AtlasDetail({
               priority
             />
           </div>
-          {/* Footer strip — viewer-style metadata */}
+          {/* Footer strip — viewer-style metadata. Credibility note now
+              calls out both ends: real reference vs AI placeholder, in
+              violet (AI) / cyan (peer-reviewed) / green (community), so
+              students can't accidentally treat one as the other. */}
           <div className="flex items-center justify-between px-3 py-2 bg-[var(--color-surface-2)] border-t border-[var(--color-border)] text-[10px] font-mono text-[var(--color-text-muted)]">
             <span>
               {entry.modality} · {species} · {part} · {entry.view}
             </span>
-            {entry.credibility === "ai-generated" && (
-              <span className="text-[var(--color-tool-cyan)]">AI-generated · illustrative</span>
+            {entry.credibility === "ai-generated" ? (
+              <span className="text-[var(--color-tool-violet)]">🤖 AI-generated · illustrative only</span>
+            ) : entry.credibility === "peer-reviewed" ? (
+              <span className="text-[var(--color-tool-cyan)]">✓ Peer-reviewed reference</span>
+            ) : (
+              <span className="text-[var(--color-finalized)]">✓ {entry.credibility} reference</span>
             )}
           </div>
         </div>
@@ -137,10 +144,17 @@ export function AtlasDetail({
               Credibility
             </dt>
             <dd>
+              {/* Color matches the per-tile badge in AtlasCard:
+                  cyan = peer-reviewed (most rigorous · Zenodo)
+                  green = community / open-textbook / cuvet-internal
+                  violet = ai-generated (illustrative)
+                  Stay in lockstep with getCredBadge in AtlasCard. */}
               <span
                 className={
-                  entry.credibility === "ai-generated"
+                  entry.credibility === "peer-reviewed"
                     ? "text-[var(--color-tool-cyan)]"
+                    : entry.credibility === "ai-generated"
+                    ? "text-[var(--color-tool-violet)]"
                     : "text-[var(--color-finalized)]"
                 }
               >

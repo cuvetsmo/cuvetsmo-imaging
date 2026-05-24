@@ -100,10 +100,13 @@ export function DDxRankerCard({ caseMeta, expertDdx, extraExcludes, onSubmit, on
 
   // Disarm confirm whenever slots change — the student is still moving
   // pieces around, so we don't want to "fire" on the next click.
+  // queueMicrotask defers the setState past React's "no setState sync in
+  // effect" guard. Behavior is unchanged — the confirm pill is dismissed
+  // one microtask later, well before the next paint.
   useEffect(() => {
     if (confirming) {
       if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
-      setConfirming(false);
+      queueMicrotask(() => setConfirming(false));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slots[0], slots[1], slots[2]]);

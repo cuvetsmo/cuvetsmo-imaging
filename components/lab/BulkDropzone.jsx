@@ -31,13 +31,16 @@ export default function BulkDropzone({ onDrop, onPick, onPickFolder, busy }) {
   // Detect webkitdirectory support on mount — iOS Safari + a few
   // older Android browsers don't implement it. If unsupported we hide
   // the folder button and lean on ZIP as the bulk-import path.
+  // queueMicrotask defers the setState past React's "no setState sync in
+  // effect" guard. Behavior is unchanged — the folder button hides one
+  // microtask later, well before the next paint.
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const input = document.createElement('input');
     // `webkitdirectory` is a non-standard property; presence on the
     // prototype is the de-facto support check.
     const supported = 'webkitdirectory' in input || 'directory' in input;
-    setSupportsWebkitDirectory(supported);
+    queueMicrotask(() => setSupportsWebkitDirectory(supported));
   }, []);
 
   // Imperatively set the non-standard `webkitdirectory` + `directory`

@@ -288,6 +288,13 @@ export default function ImageOcclusionEditor({ initialDeck, onSave, onClose }) {
       className="vmx-modal-overlay"
       style={{ alignItems: 'flex-start', padding: 'env(safe-area-inset-top) 0 env(safe-area-inset-bottom)', overflow: 'auto' }}
     >
+      {/* Focus-visible ring for the keyboard-activated upload dropzone. */}
+      <style>{`
+        .occlusion-editor-dropzone:focus-within {
+          outline: 2px solid var(--clr-sage);
+          outline-offset: 4px;
+        }
+      `}</style>
       <div
         className="vmx-modal"
         style={{
@@ -327,12 +334,29 @@ export default function ImageOcclusionEditor({ initialDeck, onSave, onClose }) {
 
         {/* Toolbar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+          {/* File input — referenced by the toolbar "อัปโหลดรูป" button via
+              ref.click() AND (when canvas is empty) by the dropzone <label>
+              via htmlFor="occlusion-editor-file". Visually hidden but
+              Tab-focusable so screen readers + keyboard users can reach it
+              through the dropzone-as-label affordance. */}
           <input
             ref={fileInputRef}
+            id="occlusion-editor-file"
             type="file"
             accept={ACCEPT_TYPES}
-            onChange={(e) => onFile(e.target.files?.[0])}
-            style={{ display: 'none' }}
+            aria-label="อัปโหลดรูปสำหรับ image occlusion deck — รองรับ PNG, JPG, WebP, SVG"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onFile(f);
+              e.target.value = '';
+            }}
+            style={{
+              position: 'absolute',
+              width: 1, height: 1,
+              padding: 0, margin: -1,
+              overflow: 'hidden', clip: 'rect(0 0 0 0)',
+              whiteSpace: 'nowrap', border: 0,
+            }}
           />
           <button
             type="button"
@@ -377,12 +401,17 @@ export default function ImageOcclusionEditor({ initialDeck, onSave, onClose }) {
 
         {/* Canvas area */}
         {!imageDataUrl ? (
-          <div
+          // A11y: <label htmlFor="occlusion-editor-file"> ties this dropzone
+          // to the hidden file input above, so screen readers announce its
+          // purpose, Tab focuses the input, and Enter/Space opens the picker
+          // — all native browser behavior. Drag-drop handlers stay here.
+          <label
+            htmlFor="occlusion-editor-file"
             onDragOver={onDragOver}
             onDragLeave={onDragLeave}
             onDrop={onDrop}
-            onClick={() => fileInputRef.current?.click()}
             style={{
+              display: 'block',
               border: `2px dashed ${dragOver ? 'var(--clr-sage)' : 'var(--clr-border)'}`,
               borderRadius: 12,
               padding: '60px 20px',
@@ -390,14 +419,16 @@ export default function ImageOcclusionEditor({ initialDeck, onSave, onClose }) {
               cursor: 'pointer',
               background: dragOver ? 'var(--clr-sage-soft)' : 'var(--clr-surface)',
               color: 'var(--clr-ink-soft)',
+              outlineOffset: 4,
             }}
+            className="occlusion-editor-dropzone"
           >
-            <div style={{ fontSize: 36, marginBottom: 8 }}>📷</div>
+            <div style={{ fontSize: 36, marginBottom: 8 }} aria-hidden="true">📷</div>
             <div style={{ fontWeight: 600, color: 'var(--clr-ink)', marginBottom: 4 }}>
               อัปโหลดรูป
             </div>
             <div style={{ fontSize: 13 }}>คลิก หรือ ลากไฟล์มาวาง · PNG / JPG / WebP / SVG</div>
-          </div>
+          </label>
         ) : (
           <div
             ref={canvasRef}

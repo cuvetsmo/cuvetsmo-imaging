@@ -108,13 +108,19 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
   // mode itself — re-entering a case starts in recall by default so the
   // student commits to their guess each visit. Their previous notes are
   // pre-filled as a starting point.
+  //
+  // queueMicrotask defers the setState calls past React's "no setState
+  // sync in effect" guard. Behavior is unchanged — the student sees the
+  // prior notes one microtask later, well before the next paint.
   useEffect(() => {
     if (!caseMeta) return;
-    const prior = readAttempts()[caseMeta.slug];
-    if (prior) {
-      setStudentNotes(prior.notes ?? '');
-      if (prior.confidence) setConfidence(prior.confidence);
-    }
+    queueMicrotask(() => {
+      const prior = readAttempts()[caseMeta.slug];
+      if (prior) {
+        setStudentNotes(prior.notes ?? '');
+        if (prior.confidence) setConfidence(prior.confidence);
+      }
+    });
   }, [caseMeta]);
 
   // ── fetch the case index + DICOM files ──

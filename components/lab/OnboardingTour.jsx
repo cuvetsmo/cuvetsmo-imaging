@@ -169,6 +169,24 @@ export default function OnboardingTour({ open, onClose, onComplete }) {
     };
   }, [open, step]);
 
+  // Stable close handler — declared BEFORE the Esc-handler effect so React
+  // Compiler's "no access before declaration" rule is satisfied. Tracks
+  // onClose / onComplete in the dep array so identity changes are picked up.
+  const handleClose = useCallback(
+    (reason) => {
+      try {
+        localStorage.setItem(TOUR_KEY, '1');
+      } catch {
+        /* quota / disabled */
+      }
+      onClose?.(reason);
+      if (reason !== 'escape' && reason !== 'backdrop' && reason !== 'skip') {
+        onComplete?.();
+      }
+    },
+    [onClose, onComplete]
+  );
+
   // Esc-to-close + focus management.
   useEffect(() => {
     if (!open) return;
@@ -214,9 +232,7 @@ export default function OnboardingTour({ open, onClose, onComplete }) {
         /* element gone */
       }
     };
-    // handleClose is stable enough — we don't recreate it per render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, handleClose]);
 
   // Move focus to the primary CTA whenever a new step opens. requestAnimationFrame
   // gives React + the layout effect time to mount the new card.
@@ -228,21 +244,6 @@ export default function OnboardingTour({ open, onClose, onComplete }) {
     });
     return () => cancelAnimationFrame(id);
   }, [open, stepIdx]);
-
-  const handleClose = useCallback(
-    (reason) => {
-      try {
-        localStorage.setItem(TOUR_KEY, '1');
-      } catch {
-        /* quota / disabled */
-      }
-      onClose?.(reason);
-      if (reason !== 'escape' && reason !== 'backdrop' && reason !== 'skip') {
-        onComplete?.();
-      }
-    },
-    [onClose, onComplete]
-  );
 
   const next = useCallback(() => {
     if (isLast) {

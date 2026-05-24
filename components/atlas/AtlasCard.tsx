@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   type AtlasEntry,
+  type Credibility,
   BODY_PART_LABELS,
   SPECIES_LABELS,
 } from "@/lib/atlas";
@@ -22,6 +23,7 @@ import {
 export function AtlasCard({ entry }: { entry: AtlasEntry }) {
   const species = SPECIES_LABELS[entry.species];
   const part = BODY_PART_LABELS[entry.body_part];
+  const cred = getCredBadge(entry.credibility);
 
   return (
     <Link
@@ -43,10 +45,18 @@ export function AtlasCard({ entry }: { entry: AtlasEntry }) {
         <div className="absolute top-2 left-2 inline-flex items-center gap-1 rounded bg-[rgba(0,0,0,0.7)] backdrop-blur-sm px-2 py-0.5 text-[10px] uppercase tracking-wider text-[var(--color-tool-cyan)] border border-[var(--color-border-bright)] font-mono">
           {entry.modality} · {entry.view}
         </div>
-        {/* AI-generated honesty badge — bottom-right when applicable */}
-        {entry.credibility === "ai-generated" && (
-          <div className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded bg-[rgba(0,0,0,0.7)] backdrop-blur-sm px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[var(--color-text-muted)] border border-[var(--color-border)] font-mono">
-            AI-gen
+        {/* Credibility honesty badge — bottom-right, ALWAYS rendered for
+            visual parity. Real entries (peer-reviewed / community) get a
+            cyan/green checkmark; ai-generated gets the violet 🤖 AI-gen
+            badge. Same position so students can scan the corner once
+            and know what they're looking at. */}
+        {cred && (
+          <div
+            className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded bg-[rgba(0,0,0,0.7)] backdrop-blur-sm px-1.5 py-0.5 text-[9px] uppercase tracking-wider border font-mono"
+            style={{ color: cred.color, borderColor: cred.borderColor }}
+            aria-label={cred.ariaLabel}
+          >
+            {cred.label}
           </div>
         )}
       </div>
@@ -64,4 +74,63 @@ export function AtlasCard({ entry }: { entry: AtlasEntry }) {
       </div>
     </Link>
   );
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// Credibility → badge mapping. Colors match the global token system:
+//  - cyan (#5ACCE6) = peer-reviewed (most rigorous · Zenodo dataset)
+//  - green (#34D399, --color-finalized) = community + open-textbook +
+//    cuvet-internal (verified but less formal)
+//  - violet (#A78BFA) = ai-generated (illustrative, NOT diagnostic)
+// Keeping inline color refs (vs CSS classes) lets us drive both the
+// foreground and border off the same token in one place; if you change
+// a token in globals.css this still tracks because the values mirror it.
+// ───────────────────────────────────────────────────────────────────────
+type CredBadge = {
+  label: string;
+  color: string;
+  borderColor: string;
+  ariaLabel: string;
+};
+
+function getCredBadge(c: Credibility): CredBadge | null {
+  switch (c) {
+    case "peer-reviewed":
+      return {
+        label: "✓ Peer-reviewed",
+        color: "#5ACCE6", // --color-tool-cyan
+        borderColor: "rgba(90,204,230,0.55)",
+        ariaLabel: "Peer-reviewed reference radiograph",
+      };
+    case "community":
+      return {
+        label: "✓ Community",
+        color: "#34D399", // --color-finalized
+        borderColor: "rgba(52,211,153,0.55)",
+        ariaLabel: "Community-sourced reference radiograph",
+      };
+    case "open-textbook":
+      return {
+        label: "✓ Textbook",
+        color: "#34D399", // --color-finalized (grouped with community)
+        borderColor: "rgba(52,211,153,0.55)",
+        ariaLabel: "Open-textbook reference radiograph",
+      };
+    case "cuvet-internal":
+      return {
+        label: "✓ CUVET",
+        color: "#34D399", // --color-finalized
+        borderColor: "rgba(52,211,153,0.55)",
+        ariaLabel: "CUVET internal reference radiograph",
+      };
+    case "ai-generated":
+      return {
+        label: "🤖 AI-gen",
+        color: "#A78BFA", // --color-tool-violet
+        borderColor: "rgba(167,139,250,0.55)",
+        ariaLabel: "AI-generated illustrative placeholder, not a real diagnostic radiograph",
+      };
+    default:
+      return null;
+  }
 }

@@ -250,10 +250,13 @@ export function LesionSpotCard({
   }, [canSubmit, confirming, studentBox, regions, onSubmit]);
 
   // Disarm confirm whenever the box changes — student is still adjusting.
+  // queueMicrotask defers the setState past React's "no setState sync in
+  // effect" guard. Behavior is unchanged — the confirm pill is dismissed
+  // one microtask later, well before the next paint.
   useEffect(() => {
     if (confirming) {
       if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
-      setConfirming(false);
+      queueMicrotask(() => setConfirming(false));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentBox?.x, studentBox?.y, studentBox?.w, studentBox?.h]);

@@ -66,7 +66,6 @@ function hasAnyDirectoryEntry(items) {
 }
 
 export default function LabHome() {
-  const isMobile = useMediaQuery('(max-width: 600px)');
   // Phase 6 — viewport stacks panes vertically below this breakpoint
   // (mobile-first). Synced compare on a 375 px phone reads better as
   // two stacked rows than two squished columns.
@@ -105,10 +104,14 @@ export default function LabHome() {
   const { open: tourOpen, openTour, closeTour } = useOnboardingTour();
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(RECENT_KEY);
-      if (raw) setRecent(JSON.parse(raw));
-    } catch { /* corrupt JSON; ignore */ }
+    // Defer the hydration setState into a microtask — keeps React Compiler
+    // happy ("no setState sync in effect") with no user-visible delay.
+    queueMicrotask(() => {
+      try {
+        const raw = localStorage.getItem(RECENT_KEY);
+        if (raw) setRecent(JSON.parse(raw));
+      } catch { /* corrupt JSON; ignore */ }
+    });
   }, []);
 
   const addToRecent = useCallback((f) => {

@@ -61,7 +61,6 @@ export async function loadCases(): Promise<ImagingCase[]> {
     .order("created_at", { ascending: false });
 
   if (error || !data) {
-    // eslint-disable-next-line no-console
     console.warn(
       "[cuvetsmo-imaging] Supabase case load failed, using static fallback.",
       error,
@@ -88,7 +87,6 @@ export async function loadCaseBySlug(slug: string): Promise<ImagingCase | null> 
     .maybeSingle();
 
   if (error) {
-    // eslint-disable-next-line no-console
     console.warn(
       "[cuvetsmo-imaging] Supabase case-by-slug load failed, falling back.",
       error,

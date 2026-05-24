@@ -14,17 +14,23 @@ const STORAGE_KEY = "cuvi-atlas-filters-v1";
 type ModalityFilter = Modality | "all";
 type SpeciesFilter = Species | "all";
 type BodyFilter = BodyPart | "all";
+// Credibility quick-filter splits the catalog into "real reference"
+// (peer-reviewed / community / open-textbook / cuvet-internal) vs
+// "ai-illustrative" (ai-generated). Single-select like other facets.
+type CredFilter = "all" | "real" | "ai";
 
 type FilterState = {
   modality: ModalityFilter;
   species: SpeciesFilter;
   body: BodyFilter;
+  credibility: CredFilter;
 };
 
 const DEFAULT_FILTERS: FilterState = {
   modality: "all",
   species: "all",
   body: "all",
+  credibility: "all",
 };
 
 // External subscription store for the filter set.
@@ -46,10 +52,21 @@ function readFromStorage(): FilterState {
       modality: parsed.modality ?? "all",
       species: parsed.species ?? "all",
       body: parsed.body ?? "all",
+      // credibility added Phase 7 · default "all" for back-compat with
+      // existing v1 persisted state.
+      credibility: parsed.credibility ?? "all",
     };
   } catch {
     return DEFAULT_FILTERS;
   }
+}
+
+// Predicate — what counts as "real reference material" for atlas
+// credibility filtering. Anything not explicitly ai-generated. Mirrors
+// the badge logic in AtlasCard so header counts and tile badges stay
+// in lockstep.
+function isRealEntry(e: AtlasEntry): boolean {
+  return e.credibility !== "ai-generated";
 }
 
 function getSnapshot(): FilterState {
@@ -135,13 +152,16 @@ export function AtlasGrid({ entries }: { entries: AtlasEntry[] }) {
   const setBody = useCallback((k: BodyFilter) => {
     writeFilters({ ...getSnapshot(), body: k });
   }, []);
+  const setCredibility = useCallback((k: CredFilter) => {
+    writeFilters({ ...getSnapshot(), credibility: k });
+  }, []);
 
   const resetFilters = useCallback(() => {
     writeFilters(DEFAULT_FILTERS);
   }, []);
 
-  // Filter chain — all three filters are AND-combined. Counts for each
-  // facet are computed against the OTHER two filters so disabled chips
+  // Filter chain — all four filters are AND-combined. Counts for each
+  // facet are computed against the OTHER filters so disabled chips
   // accurately reflect "nothing would match if you click this." Cheap
   // for 10 entries; if this grows past ~500 we should index by facet.
   const filtered = useMemo(() => {
@@ -149,9 +169,21 @@ export function AtlasGrid({ entries }: { entries: AtlasEntry[] }) {
       if (filters.modality !== "all" && e.modality !== filters.modality) return false;
       if (filters.species !== "all" && e.species !== filters.species) return false;
       if (filters.body !== "all" && e.body_part !== filters.body) return false;
+      if (filters.credibility === "real" && !isRealEntry(e)) return false;
+      if (filters.credibility === "ai" && isRealEntry(e)) return false;
       return true;
     });
   }, [entries, filters]);
+
+  // Real-vs-AI split for the header counts pill. Computed over the
+  // FULL catalog, not the filtered set — header counts always reflect
+  // "what exists" so the segment numbers stay stable as students toggle
+  // other facets. Iron Rule 0: derived from the data, never hardcoded.
+  const realCount = useMemo(
+    () => entries.filter(isRealEntry).length,
+    [entries]
+  );
+  const aiCount = entries.length - realCount;
 
   // Per-facet counts — count what would match if THIS chip were selected,
   // holding the OTHER two filters constant. Used to disable empty chips.
@@ -190,7 +222,10 @@ export function AtlasGrid({ entries }: { entries: AtlasEntry[] }) {
   }, [entries, filters]);
 
   const hasActiveFilters =
-    filters.modality !== "all" || filters.species !== "all" || filters.body !== "all";
+    filters.modality !== "all" ||
+    filters.species !== "all" ||
+    filters.body !== "all" ||
+    filters.credibility !== "all";
 
   return (
     <div>
@@ -202,11 +237,48 @@ export function AtlasGrid({ entries }: { entries: AtlasEntry[] }) {
         <h1 className="imaging-display text-3xl sm:text-4xl text-[var(--color-text)] mb-3">
           Anatomy Atlas — normal radiograph reference
         </h1>
-        <p className="text-[14px] sm:text-base text-[var(--color-text-muted)] leading-relaxed max-w-2xl">
+        <p className="text-[14px] sm:text-base text-[var(--color-text-muted)] leading-relaxed max-w-2xl mb-4">
           ดู <span className="text-[var(--color-tool-cyan)]">normal</span> ให้ครบ 100 ครั้งก่อน
           ค่อยอ่าน abnormal ออก. กรองตาม modality · species · body part เพื่อ
           เปรียบเทียบ baseline ก่อนเปิด clinical case.
         </p>
+
+        {/* Credibility split pill — clickable quick-filter. Real entries
+            (peer-reviewed + community) are shown alongside AI-illustrative
+            placeholders so students can tell at a glance what's reference
+            material vs what's only a layout sketch. Counts derive from the
+            data — Iron Rule 0, no hardcoded numbers. */}
+        <div
+          className="inline-flex items-center gap-1 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] p-1 text-[11px] font-mono"
+          role="group"
+          aria-label="Credibility quick filter"
+        >
+          <CredSegment
+            active={filters.credibility === "real"}
+            onClick={() =>
+              setCredibility(filters.credibility === "real" ? "all" : "real")
+            }
+            color="green"
+            aria-label={`Show ${realCount} real reference radiographs only`}
+          >
+            <span aria-hidden>📚</span>
+            <span className="text-[var(--color-text)]">{realCount}</span>
+            <span className="text-[var(--color-text-muted)]">real</span>
+          </CredSegment>
+          <span aria-hidden className="text-[var(--color-text-faint)] px-0.5">·</span>
+          <CredSegment
+            active={filters.credibility === "ai"}
+            onClick={() =>
+              setCredibility(filters.credibility === "ai" ? "all" : "ai")
+            }
+            color="violet"
+            aria-label={`Show ${aiCount} AI-illustrative entries only`}
+          >
+            <span aria-hidden>🤖</span>
+            <span className="text-[var(--color-text)]">{aiCount}</span>
+            <span className="text-[var(--color-text-muted)]">AI-illustrative</span>
+          </CredSegment>
+        </div>
       </header>
 
       {/* ──── FILTERS · sticky below site header (40 EcosystemBar + ~57 SiteHeader = 97) ──── */}
@@ -267,11 +339,32 @@ export function AtlasGrid({ entries }: { entries: AtlasEntry[] }) {
       )}
 
       {/* ──── HONESTY FOOTNOTE ──── */}
+      {/* Atlas is a mix — students must be able to tell which tiles are
+          real reference material vs which are AI-illustrative placeholders.
+          Counts are derived from the data above (Iron Rule 0). Keep this
+          paragraph honest about both the swapped-in real sources and the
+          remaining AI-gen placeholders earmarked for upgrade. */}
       <p className="mt-10 text-[11px] text-[var(--color-text-faint)] text-center max-w-2xl mx-auto leading-relaxed">
-        Day-1 atlas seeded with AI-generated radiographs (Pollinations.ai Flux).
-        Honesty tag <span className="text-[var(--color-tool-cyan)] font-mono">AI-gen</span> on
-        each tile · upgrade path: swap in real CC-BY images from Mendeley / Wikimedia / open
-        vet atlases as we find them.
+        Atlas tiles are a mix:{" "}
+        <span className="text-[var(--color-finalized)] font-mono">{realCount} real</span>{" "}
+        reference radiographs (CC BY / CC BY-SA, sourced from the{" "}
+        <a
+          href="https://zenodo.org/records/19051776"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[var(--color-tool-cyan)] hover:underline"
+        >
+          VetXRay Zenodo dataset
+        </a>{" "}
+        and Wikimedia Commons) and{" "}
+        <span className="text-[var(--color-tool-violet)] font-mono">{aiCount} AI-illustrative</span>{" "}
+        placeholders (Pollinations.ai Flux), flagged for upgrade to real CC-BY images as we find them.
+        Real-reference tiles carry a{" "}
+        <span className="text-[var(--color-finalized)] font-mono">✓ Peer-reviewed</span> or{" "}
+        <span className="text-[var(--color-finalized)] font-mono">✓ Community</span> badge;
+        AI-illustrative tiles keep the{" "}
+        <span className="text-[var(--color-tool-violet)] font-mono">🤖 AI-gen</span> badge.
+        Trust the badge, not the filename.
       </p>
     </div>
   );
@@ -359,5 +452,45 @@ function EmptyState({ onReset }: { onReset: () => void }) {
         ล้างตัวกรองทั้งหมด
       </button>
     </div>
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// CredSegment — one clickable segment in the credibility split pill.
+// Toggle behaviour (click active → returns to "all") makes the pill a
+// quick-filter shortcut for the same logic as a dedicated filter row
+// without doubling the chrome.
+// ───────────────────────────────────────────────────────────────────────
+function CredSegment({
+  active,
+  onClick,
+  color,
+  children,
+  ...rest
+}: {
+  active: boolean;
+  onClick: () => void;
+  color: "green" | "violet";
+  children: React.ReactNode;
+} & React.AriaAttributes) {
+  const activeBg =
+    color === "green"
+      ? "bg-[rgba(52,211,153,0.18)] border-[var(--color-finalized)]"
+      : "bg-[rgba(167,139,250,0.18)] border-[var(--color-tool-violet)]";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={[
+        "inline-flex items-center gap-1.5 min-h-[28px] px-2.5 py-1 rounded text-[11px] transition-colors border",
+        active
+          ? activeBg
+          : "border-transparent hover:bg-[var(--color-surface-3)]",
+      ].join(" ")}
+      {...rest}
+    >
+      {children}
+    </button>
   );
 }

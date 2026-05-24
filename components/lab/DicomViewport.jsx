@@ -18,6 +18,7 @@ import NorbergOverlay from './NorbergOverlay.jsx';
 import VHSOverlay from './VHSOverlay.jsx';
 import AIOverlay from './AIOverlay.jsx';
 import ShortcutCheatsheet from './ShortcutCheatsheet.jsx';
+import MobileToolbarSheet from './MobileToolbarSheet.jsx';
 import { useMediaQuery } from '../../lib/dicom/use-media-query.js';
 import {
   WL_PRESETS,
@@ -142,6 +143,11 @@ export default function DicomViewport({
   const engineRef = useRef(null);
   const viewportIdRef = useRef(null);
   const toolGroupIdRef = useRef(null);
+  // Hoisted from below: the engine-setup effect writes `.current = true`
+  // around the initial smart-W/L apply, so the ref must be declared
+  // before that effect runs. See the longer note at the (former)
+  // declaration site for full intent.
+  const isApplyingPresetRef = useRef(false);
   const [status, setStatus] = useState('init');
   const [errorMsg, setErrorMsg] = useState('');
   const [meta, setMeta] = useState(null);
@@ -150,6 +156,19 @@ export default function DicomViewport({
   // async, but we update React state synchronously on user input — the
   // STACK_NEW_IMAGE listener reconciles in case of double-fire / race.
   const [sliceIdx, setSliceIdx] = useState(0);
+  // Hoisted up here (was below, but the load + selectTool callbacks
+  // reference these setters; React Compiler flags use-before-declare
+  // when state hooks land further down the function body).
+  const [species, setSpecies] = useState('');
+  // First-load nudge — small floating tip near the canvas that hints
+  // the measurement workflow. Auto-fades after 6 s or on any tool
+  // selection (other than the default W/L which is auto-active).
+  const [showFirstHint, setShowFirstHint] = useState(false);
+  // Phase 7 — mobile toolbar overflow drawer. Off-canvas bottom sheet
+  // that exposes the full tool list with names + keyboard hints, so
+  // the visible mobile toolbar can stay at 4 tools + a "More" entry
+  // (no horizontal scroll for beginners).
+  const [showMobileMore, setShowMobileMore] = useState(false);
 
   useEffect(() => {
     if (filesArray.length === 0) return;
@@ -280,7 +299,6 @@ export default function DicomViewport({
         setStatus('ready');
         setActiveTool('wl');
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error('[DicomViewport] load error:', err);
         if (!cancelled) {
           setStatus('error');
@@ -335,7 +353,6 @@ export default function DicomViewport({
         bindings: [{ mouseButton: ToolEnums.MouseBindings.Secondary }],
       });
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('[selectTool] bind error:', err);
     }
   }, []);
@@ -344,15 +361,13 @@ export default function DicomViewport({
   // `null` while smart-W/L initial compute is in flight or after the
   // user has manually adjusted W/L via the WindowLevelTool drag.
   const [activePreset, setActivePreset] = useState(null);
-  // Suppress the VOI_MODIFIED → setActivePreset(null) drift-clear for
-  // our OWN programmatic voiRange writes (preset apply · smart auto ·
-  // reset). Same shape as the camera-sync `isApplying` flag, but here
-  // it's a ref because the VOI event handler doesn't need to re-render
-  // when the flag flips — it just reads it. Set true BEFORE the write,
-  // reset in `queueMicrotask` so any synchronous VOI_MODIFIED bounce
-  // from `setProperties`/`resetProperties` is gated and any genuine
-  // user-drag VOI events arriving in later microtasks fall through.
-  const isApplyingPresetRef = useRef(false);
+  // (isApplyingPresetRef moved to the top of the component body.
+  // The longer rationale: gate the VOI_MODIFIED → setActivePreset(null)
+  // drift-clear for our OWN programmatic voiRange writes (preset apply ·
+  // smart auto · reset). Set true BEFORE the write, reset in a
+  // queueMicrotask so any synchronous VOI_MODIFIED bounce is gated and
+  // any genuine user-drag VOI events arriving in later microtasks fall
+  // through.)
   // Ephemeral toast at bottom-center — fades after ~1.2 s. Cleared by
   // ID so rapid preset taps replace the previous toast instead of
   // queueing up.
@@ -425,7 +440,6 @@ export default function DicomViewport({
       viewport.setZoom(z * factor);
       viewport.render();
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('[zoomBy] error:', err);
     }
   }, []);
@@ -456,14 +470,16 @@ export default function DicomViewport({
   const [aiPrediction, setAiPrediction] = useState(null);
   const [aiError, setAiError] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [species, setSpecies] = useState('');
-  // First-load nudge — small floating tip near the canvas that hints
-  // the measurement workflow. Auto-fades after 6 s or on any tool
-  // selection (other than the default W/L which is auto-active).
-  const [showFirstHint, setShowFirstHint] = useState(false);
+  // (species + showFirstHint moved to the top of the component so
+  // earlier-bodied callbacks/effects can reference them without
+  // tripping React Compiler's use-before-declare rule.)
   useEffect(() => {
     if (status !== 'ready') return;
-    setShowFirstHint(true);
+    // Microtask-defer the initial setState so the effect body itself
+    // doesn't synchronously call setState (React Compiler rule). The
+    // 6.5 s auto-hide setTimeout fires its own setState from a task
+    // callback (not effect-body), which is allowed.
+    queueMicrotask(() => setShowFirstHint(true));
     const t = setTimeout(() => setShowFirstHint(false), 6500);
     return () => clearTimeout(t);
   }, [status, filesKey]);
@@ -517,7 +533,6 @@ export default function DicomViewport({
       const baseFilename = `${baseName}${sliceSuffix}_annotated`;
       await mod.exportAnnotatedPng({ containerEl: elRef.current, baseFilename });
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('[exportPng] error:', err);
     }
   }, [primaryFile, isStackMode, sliceCount, sliceIdx]);
@@ -531,7 +546,6 @@ export default function DicomViewport({
       const all = annotation.state.getAllAnnotations();
       all.forEach((a) => annotation.state.removeAnnotation(a.annotationUID));
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('[clearMeasurements] error:', err);
     }
     try {
@@ -603,7 +617,6 @@ export default function DicomViewport({
         vp.render();
         requestAnimationFrame(() => { isApplyingCamera = false; });
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error('[viewport-sync] camera apply error:', err);
         isApplyingCamera = false;
       }
@@ -666,7 +679,6 @@ export default function DicomViewport({
         // (target === cur) above catches that case so no infinite loop.
         requestAnimationFrame(() => { isApplyingSlice = false; });
       } catch (err) {
-        // eslint-disable-next-line no-console
         console.error('[viewport-sync] slice apply error:', err);
         isApplyingSlice = false;
       }
@@ -996,14 +1008,63 @@ export default function DicomViewport({
     goToSlice,
   ]);
 
+  // Phase 7 — Pattern A: segmented mobile toolbar with bottom-sheet
+  // drawer. On phone-width viewports we show the 4 most-used tools
+  // (Pan · W/L · Zoom · Reset) plus a "⋯ More" trigger; the drawer
+  // exposes every other tool with full name + keyboard shortcut.
+  // Desktop keeps the full flat toolbar — no regression.
   return (
     <div>
-      {status === 'ready' && (
-        <div style={isMobile ? toolbarMobileStyle : toolbarStyle}>
-          {!isMobile && <span style={labelStyle}>Nav:</span>}
+      {status === 'ready' && isMobile && (
+        <div style={toolbarMobileStyle}>
+          {/* 4 visible primary tools at 375px. Order tuned for radiograph
+              workflow: Pan / Zoom / W/L are the constant-use trio; Reset
+              is the "undo my exploration" escape hatch.
+              Labels use emoji + 1-3 char text so 5 buttons (4 tools + More)
+              comfortably fit a 375px viewport with no horizontal scroll.
+              Active tool gets the cyan ring via TBtn's active prop;
+              long-press / hover surfaces the full name via title attr. */}
+          <TBtn
+            active={activeTool === 'pan'}
+            onClick={() => selectTool('pan')}
+            title="Pan — drag to move the image (P)"
+          >✋ Pan</TBtn>
+          <TBtn
+            active={activeTool === 'zoom'}
+            onClick={() => selectTool('zoom')}
+            title="Zoom — pinch or drag to zoom (Z)"
+          >🔍 Zoom</TBtn>
+          <TBtn
+            active={activeTool === 'wl'}
+            onClick={() => selectTool('wl')}
+            title="Window/Level — drag to brighten or darken (W)"
+          >🌓 W/L</TBtn>
+          <TBtn
+            onClick={resetView}
+            title="Reset view — restore zoom/pan/W/L (R)"
+          >↺</TBtn>
+          {/* Stack-scroll prev/next live in the More drawer on mobile
+              along with the slice indicator pill, so the primary row
+              isn't reordered when a CT study loads.
+              The More trigger uses a muted border so it doesn't compete
+              visually with active-tool styling. Always present. */}
+          <button
+            type="button"
+            onClick={() => setShowMobileMore(true)}
+            aria-label="แสดงเครื่องมือเพิ่ม"
+            aria-haspopup="dialog"
+            aria-expanded={showMobileMore}
+            title="More tools — Length · Angle · Norberg · VHS · presets · export · AI"
+            style={moreBtnStyle}
+          >⋯ More</button>
+        </div>
+      )}
+      {status === 'ready' && !isMobile && (
+        <div style={toolbarStyle}>
+          <span style={labelStyle}>Nav:</span>
           {navTools.map((t) => (
             <TBtn key={t} active={activeTool === t} onClick={() => selectTool(t)} title={`${TOOLS[t].label} — shortcut (${TOOLS[t].sk})`}>
-              {isMobile ? TOOLS[t].short : TOOLS[t].label}
+              {TOOLS[t].label}
             </TBtn>
           ))}
           {/* Phase 5 — stack-scroll controls. Only render when there's a
@@ -1025,7 +1086,7 @@ export default function DicomViewport({
                 aria-label={`${paneLabel ? `${paneLabel} pane, ` : ''}Slice ${sliceIdx + 1} of ${sliceCount}`}
                 title="Slice indicator — use ↑/↓ arrows, PgUp/PgDn, Home/End, or scroll"
               >
-                {paneLabel ? `${paneLabel}: ` : (isMobile ? '📚 ' : '📚 Slice ')}
+                {paneLabel ? `${paneLabel}: ` : '📚 Slice '}
                 {formatSlicePos(sliceIdx, sliceCount)}
               </span>
               <TBtn
@@ -1036,15 +1097,15 @@ export default function DicomViewport({
             </>
           )}
           <Divider />
-          {!isMobile && <span style={labelStyle}>Measure:</span>}
+          <span style={labelStyle}>Measure:</span>
           {measureTools.map((t) => (
             <TBtn key={t} active={activeTool === t} onClick={() => selectTool(t)} title={`${TOOLS[t].label} — shortcut (${TOOLS[t].sk})`}>
-              {isMobile ? TOOLS[t].short : TOOLS[t].label}
+              {TOOLS[t].label}
             </TBtn>
           ))}
-          <TBtn onClick={clearMeasurements} title="Clear all measurements (C)">{isMobile ? '🗑' : '🗑 Clear'}</TBtn>
+          <TBtn onClick={clearMeasurements} title="Clear all measurements (C)">🗑 Clear</TBtn>
           <Divider />
-          {!isMobile && <span style={labelStyle}>W/L:</span>}
+          <span style={labelStyle}>W/L:</span>
           {PRESETS.map((p, i) => {
             const sk = p.shortcut ? p.shortcut.toUpperCase() : String(i + 1);
             const title = `${p.label} — ${p.description}${p.shortcut ? ` (${sk})` : ''}`;
@@ -1062,17 +1123,17 @@ export default function DicomViewport({
             );
           })}
           <Divider />
-          {!isMobile && <span style={labelStyle}>Vet:</span>}
+          <span style={labelStyle}>Vet:</span>
           <TBtn active={activeTool === 'norberg'} onClick={() => selectTool('norberg')} title="Norberg angle (N) — 4-click">
-            {isMobile ? '🦴 N' : '🦴 Norberg'}
+            🦴 Norberg
           </TBtn>
           <TBtn active={activeTool === 'vhs'} onClick={() => selectTool('vhs')} title="Vertebral Heart Score (V) — 6-click">
-            {isMobile ? '💗 V' : '💗 VHS'}
+            💗 VHS
           </TBtn>
           <Divider />
-          {!isMobile && <span style={labelStyle}>AI:</span>}
+          <span style={labelStyle}>AI:</span>
           <label className="vmx-btn" style={aiBtnLabelStyle} title="Load AI prediction JSON for this image">
-            {isMobile ? '🤖' : '🤖 Load AI'}
+            🤖 Load AI
             <input
               type="file"
               accept=".json,application/json"
@@ -1080,18 +1141,55 @@ export default function DicomViewport({
               style={{ display: 'none' }}
             />
           </label>
-          {aiPrediction && <TBtn onClick={clearAi} title="Clear AI overlay">{isMobile ? '✕' : '✕ Clear AI'}</TBtn>}
+          {aiPrediction && <TBtn onClick={clearAi} title="Clear AI overlay">✕ Clear AI</TBtn>}
           <Divider />
-          <TBtn onClick={exportPng} title="Export annotated PNG (E)">{isMobile ? '📤' : '📤 Export PNG'}</TBtn>
+          <TBtn onClick={exportPng} title="Export annotated PNG (E)">📤 Export PNG</TBtn>
           <TBtn onClick={toggleFullscreen} title={isFullscreen ? 'ออก fullscreen (F or Esc)' : 'เปิด fullscreen (F)'}>
             {isFullscreen ? '⤢ Exit FS' : '⛶ Fullscreen'}
           </TBtn>
-          <TBtn onClick={resetView} title="Reset view (R)">{isMobile ? '↺' : '↺ Reset view'}</TBtn>
+          <TBtn onClick={resetView} title="Reset view (R)">↺ Reset view</TBtn>
           <TBtn onClick={() => setShowShortcuts((s) => !s)} title="Keyboard shortcuts (?)">⌨</TBtn>
         </div>
       )}
+      {/* Phase 7 — mobile More drawer (bottom-sheet). Mounted only on
+          mobile to avoid creating a tab-trap for desktop keyboard users.
+          Hands off every action it triggers via the same selectTool /
+          applyPreset / etc. callbacks the desktop toolbar uses. */}
+      {isMobile && (
+        <MobileToolbarSheet
+          open={showMobileMore}
+          onClose={() => setShowMobileMore(false)}
+          activeTool={activeTool}
+          activePreset={activePreset}
+          isStackMode={isStackMode}
+          sliceCount={sliceCount}
+          sliceIdx={sliceIdx}
+          paneLabel={paneLabel}
+          selectTool={selectTool}
+          applyPreset={applyPreset}
+          presets={PRESETS}
+          measureTools={measureTools}
+          clearMeasurements={clearMeasurements}
+          goToSlice={goToSlice}
+          exportPng={exportPng}
+          toggleFullscreen={toggleFullscreen}
+          isFullscreen={isFullscreen}
+          loadAiJson={loadAiJson}
+          aiPrediction={aiPrediction}
+          clearAi={clearAi}
+          openShortcuts={() => setShowShortcuts(true)}
+        />
+      )}
       {aiError && (
-        <div style={{ background: '#fff5f5', border: '1px solid #fcc', color: '#a33', padding: '4px 10px', fontSize: '0.78rem', borderRadius: 4, marginBottom: 4 }}>
+        <div style={{
+          background: 'rgba(255, 77, 109, 0.10)',
+          border: '1px solid rgba(255, 77, 109, 0.32)',
+          color: 'var(--color-active-red)',
+          padding: '4px 10px',
+          fontSize: '0.78rem',
+          borderRadius: 4,
+          marginBottom: 4,
+        }}>
           ⚠️ AI JSON parse error: {aiError}
         </div>
       )}
@@ -1128,7 +1226,7 @@ export default function DicomViewport({
           // small laptop" complaint without overflowing on tall
           // monitors. Cornerstone3D resizes canvas to match.
           height: 'clamp(380px, calc(100vh - 260px), 900px)',
-          background: '#000',
+          background: 'var(--color-surface-3)',
           borderRadius: status === 'ready' ? '0 0 8px 8px' : 8,
           position: 'relative',
           overflow: 'hidden',
@@ -1146,7 +1244,7 @@ export default function DicomViewport({
           </div>
         )}
         {status === 'error' && (
-          <div style={{ ...overlay, color: '#fbb', textAlign: 'center', padding: 20 }}>
+          <div style={{ ...overlay, color: 'var(--color-active-red)', textAlign: 'center', padding: 20 }}>
             ❌ โหลดไม่สำเร็จ<br />
             <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>{errorMsg}</span>
           </div>
@@ -1225,7 +1323,7 @@ export default function DicomViewport({
         )}
       </div>
       {meta && status === 'ready' && (
-        <div style={{ fontSize: '0.8rem', color: '#666', marginTop: 8 }}>
+        <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: 8 }}>
           📐 {meta.width} × {meta.height} pixels
           {meta.mmPerPx && (
             <> · calibrated at <strong>{meta.mmPerPx.toFixed(3)} mm/pixel</strong> (PixelSpacing tag)</>
@@ -1234,7 +1332,7 @@ export default function DicomViewport({
         </div>
       )}
       {meta && status === 'ready' && (
-        <div style={{ fontSize: '0.75rem', color: '#888', marginTop: 4 }}>
+        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-faint)', marginTop: 4 }}>
           เลือก 📏 Length หรือ 📐 Angle จาก toolbar แล้วลากบนภาพ — ผลแสดงเป็น mm จาก PixelSpacing tag. ลากซ้าย = active tool, กลาง = pan, ขวา = zoom.
         </div>
       )}
@@ -1243,32 +1341,41 @@ export default function DicomViewport({
 }
 
 function TBtn({ active, onClick, children, title, preset, ariaPressed }) {
-  // Preset buttons use a cyan ring (rather than green-bg) for the
+  // Preset buttons use a cyan ring (rather than active-bg) for the
   // "currently applied preset" indication — visually distinct from
-  // the "currently selected tool" green-bg state. Matches the brief
-  // and pairs with the OHIF-dark clinical theme of the imaging lab.
+  // the "currently selected tool" cyan-tinted bg state. Matches the
+  // OHIF-dark clinical theme of the imaging lab — all colors come
+  // from globals.css tokens so theme overrides flow through.
   const style = preset
     ? {
         minHeight: 36,
         padding: '6px 11px',
-        background: '#fff',
-        color: '#333',
-        border: '1px solid #ccc',
+        background: 'var(--color-surface-lift)',
+        color: 'var(--color-text)',
+        border: '1px solid var(--color-border-bright)',
         borderRadius: 4,
         cursor: 'pointer',
         fontSize: '0.82rem',
         whiteSpace: 'nowrap',
         lineHeight: 1.3,
         // Cyan ring when this preset is the active one.
-        boxShadow: active ? '0 0 0 2px #06b6d4, 0 0 0 4px rgba(6,182,212,0.18)' : 'none',
+        boxShadow: active
+          ? '0 0 0 2px var(--color-tool-cyan), 0 0 0 4px rgba(90, 204, 230, 0.18)'
+          : 'none',
         outline: 'none',
       }
     : {
         minHeight: 36,
         padding: '6px 11px',
-        background: active ? '#4a6b4a' : '#fff',
-        color: active ? '#fff' : '#333',
-        border: '1px solid #ccc',
+        background: active
+          ? 'rgba(90, 204, 230, 0.18)'
+          : 'var(--color-surface-lift)',
+        color: active
+          ? 'var(--color-tool-cyan)'
+          : 'var(--color-text)',
+        border: active
+          ? '1px solid var(--color-tool-cyan)'
+          : '1px solid var(--color-border-bright)',
         borderRadius: 4,
         cursor: 'pointer',
         fontSize: '0.82rem',
@@ -1290,9 +1397,9 @@ function TBtn({ active, onClick, children, title, preset, ariaPressed }) {
 const aiBtnLabelStyle = {
   minHeight: 36,
   padding: '6px 11px',
-  background: '#fff',
-  color: '#333',
-  border: '1px solid #ccc',
+  background: 'var(--color-surface-lift)',
+  color: 'var(--color-text)',
+  border: '1px solid var(--color-border-bright)',
   borderRadius: 4,
   cursor: 'pointer',
   fontSize: '0.82rem',
@@ -1306,12 +1413,14 @@ const aiBtnLabelStyle = {
 // the prev/next chevrons. Cyan ring matches the brand's active-state accent
 // so it reads as a status pill rather than a clickable control. `aria-live`
 // is set on the wrapping <span> so screen readers announce slice changes.
+// Phase 7 — text color promoted from teal-700 (#0e7490, light-mode) to
+// the brand cyan token so the pill reads on the dark OHIF-style toolbar.
 const sliceIndicatorStyle = {
   minHeight: 36,
   padding: '6px 11px',
-  background: 'rgba(6,182,212,0.10)',
-  color: '#0e7490',
-  border: '1px solid rgba(6,182,212,0.45)',
+  background: 'rgba(90, 204, 230, 0.12)',
+  color: 'var(--color-tool-cyan)',
+  border: '1px solid rgba(90, 204, 230, 0.45)',
   borderRadius: 4,
   fontSize: '0.82rem',
   fontVariantNumeric: 'tabular-nums',
@@ -1334,7 +1443,7 @@ const sliceOverlayStyle = {
   transform: 'translateX(-50%)',
   zIndex: 20,
   background: 'rgba(15, 23, 42, 0.78)',
-  color: '#fff',
+  color: 'var(--color-text)',
   padding: '6px 14px',
   borderRadius: 999,
   fontSize: '0.85rem',
@@ -1353,8 +1462,8 @@ const firstHintStyle = {
   left: '50%',
   transform: 'translateX(-50%)',
   zIndex: 11,
-  background: 'rgba(0,0,0,0.78)',
-  color: '#fff',
+  background: 'rgba(0, 0, 0, 0.78)',
+  color: 'var(--color-text)',
   padding: '8px 14px',
   borderRadius: 999,
   fontSize: '0.82rem',
@@ -1368,9 +1477,9 @@ const firstHintStyle = {
 const kbdInlineStyle = {
   display: 'inline-block',
   padding: '0 5px',
-  background: '#fff',
-  color: '#333',
-  border: '1px solid #ccc',
+  background: 'var(--color-surface-lift)',
+  color: 'var(--color-text)',
+  border: '1px solid var(--color-border-bright)',
   borderRadius: 3,
   fontFamily: 'monospace',
   fontSize: '0.78rem',
@@ -1396,7 +1505,7 @@ const toastStyle = {
   transform: 'translateX(-50%)',
   zIndex: 25,
   background: 'rgba(15, 23, 42, 0.92)', // slate-900 / 92% — works against bright + dark canvases
-  color: '#fff',
+  color: 'var(--color-text)',
   padding: '8px 16px',
   borderRadius: 999,
   fontSize: '0.85rem',
@@ -1492,7 +1601,16 @@ const cheatsheetSections = [
 ];
 
 function Divider() {
-  return <span style={{ width: 1, height: 22, background: '#ccc', margin: '0 4px' }} />;
+  return (
+    <span
+      style={{
+        width: 1,
+        height: 22,
+        background: 'var(--color-border-bright)',
+        margin: '0 4px',
+      }}
+    />
+  );
 }
 
 const toolbarStyle = {
@@ -1500,38 +1618,61 @@ const toolbarStyle = {
   gap: 6,
   flexWrap: 'wrap',
   padding: 8,
-  background: '#f5f5f5',
+  background: 'var(--color-surface-2)',
+  borderTop: '1px solid var(--color-border)',
+  borderLeft: '1px solid var(--color-border)',
+  borderRight: '1px solid var(--color-border)',
   borderRadius: '8px 8px 0 0',
   alignItems: 'center',
   fontSize: '0.85rem',
 };
 
-// Mobile toolbar — no wrap, horizontal scroll. Keeps the canvas
-// from being squished by a 4-row toolbar on phone portrait.
-// `touch-action: pan-x` lets horizontal swipe scroll the toolbar
-// without the browser also trying to navigate. Momentum scroll on
-// iOS via -webkit-overflow-scrolling.
+// Mobile toolbar — Phase 7 (segmented + drawer pattern). 4 most-used
+// tools visible by default + a "More" trigger that opens an off-canvas
+// bottom-sheet with the full list. Replaces the previous nowrap +
+// horizontal-scroll abbreviation grid that beginners found confusing.
+// `flex-wrap: nowrap` is kept but `overflowX: 'hidden'` because the
+// More drawer absorbs the spillover instead of letting it scroll.
 const toolbarMobileStyle = {
   display: 'flex',
   gap: 6,
   flexWrap: 'nowrap',
-  overflowX: 'auto',
-  overflowY: 'hidden',
+  overflow: 'hidden',
   padding: '6px 8px',
-  background: '#f5f5f5',
+  background: 'var(--color-surface-2)',
+  borderTop: '1px solid var(--color-border)',
+  borderLeft: '1px solid var(--color-border)',
+  borderRight: '1px solid var(--color-border)',
   borderRadius: '8px 8px 0 0',
   alignItems: 'center',
   fontSize: '0.85rem',
-  WebkitOverflowScrolling: 'touch',
-  touchAction: 'pan-x',
-  scrollbarWidth: 'thin',
+  touchAction: 'pan-y',
+  justifyContent: 'space-between',
 };
 
 const labelStyle = {
-  color: '#666',
+  color: 'var(--color-text-muted)',
   fontSize: '0.75rem',
   marginRight: 2,
   whiteSpace: 'nowrap',
+};
+
+// Phase 7 — "⋯ More" trigger that lives at the right edge of the mobile
+// toolbar. Same height + rounded corners as TBtn for visual cohesion,
+// but uses a muted border so it doesn't look like an active tool.
+const moreBtnStyle = {
+  minHeight: 36,
+  padding: '6px 11px',
+  background: 'var(--color-surface-lift)',
+  color: 'var(--color-text-muted)',
+  border: '1px solid var(--color-border-bright)',
+  borderRadius: 4,
+  cursor: 'pointer',
+  fontSize: '0.82rem',
+  whiteSpace: 'nowrap',
+  lineHeight: 1.3,
+  fontFamily: 'inherit',
+  flex: '0 0 auto',
 };
 
 const overlay = {
@@ -1541,7 +1682,7 @@ const overlay = {
   flexDirection: 'column',
   alignItems: 'center',
   justifyContent: 'center',
-  color: '#aaa',
+  color: 'var(--color-text-muted)',
   fontSize: '0.95rem',
   pointerEvents: 'none',
 };
