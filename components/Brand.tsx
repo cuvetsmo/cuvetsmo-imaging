@@ -97,8 +97,15 @@ export function SiteFooter() {
             </a>
           </span>
         </div>
-        <div className="text-[var(--color-text-muted)]">
-          Educational tool, not for clinical decisions.
+        <div className="flex items-center gap-3 text-[var(--color-text-muted)]">
+          <Link
+            href="/sources"
+            className="hover:text-[var(--color-tool-cyan)] transition-colors"
+          >
+            Data + learning sources
+          </Link>
+          <span aria-hidden className="text-[var(--color-border-bright)]">·</span>
+          <span>Educational tool, not for clinical decisions.</span>
         </div>
       </div>
     </footer>

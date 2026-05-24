@@ -366,7 +366,13 @@ export function AtlasGrid({ entries }: { entries: AtlasEntry[] }) {
         <span className="text-[var(--color-finalized)] font-mono">✓ Community</span> badge;
         AI-illustrative tiles keep the{" "}
         <span className="text-[var(--color-tool-violet)] font-mono">🤖 AI-gen</span> badge.
-        Trust the badge, not the filename.
+        Trust the badge, not the filename.{" "}
+        <a
+          href="/sources"
+          className="text-[var(--color-tool-cyan)] hover:underline"
+        >
+          ดูแหล่งข้อมูลทั้งหมด →
+        </a>
       </p>
     </div>
   );

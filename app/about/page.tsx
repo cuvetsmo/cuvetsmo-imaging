@@ -57,6 +57,15 @@ export default function AboutPage() {
         </a>{" "}
         — เครื่องมือทดลองโดยนิสิตสัตวแพทย์ จุฬาฯ.
       </p>
+      <p className="text-[var(--color-text-muted)] leading-relaxed mt-3">
+        เคสและภาพในเว็บมาจาก dataset เปิด CC BY 4.0 (VetXRay บน Zenodo, Mendeley VHS).
+        แหล่งเรียนรู้เพิ่มเติม (VET DICOM Library, IVRA OER, CEG VHS/VLAS viewer)
+        ลิงก์ออกครบที่หน้า{" "}
+        <Link href="/sources" className="text-[var(--color-tool-cyan)] hover:underline">
+          Data + learning sources
+        </Link>
+        .
+      </p>
 
       <h2 className="text-xl font-semibold mt-8 mb-2">Disclaimer</h2>
       <div className="rounded-md border border-[var(--color-active-red)]/40 bg-[rgba(186,31,64,0.08)] px-4 py-3 text-sm text-[var(--color-text)]">
