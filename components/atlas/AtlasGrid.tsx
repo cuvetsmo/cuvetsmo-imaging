@@ -349,7 +349,7 @@ export function AtlasGrid({ entries }: { entries: AtlasEntry[] }) {
       <p className="mt-10 text-[11px] text-[var(--color-text-faint)] text-center max-w-2xl mx-auto leading-relaxed">
         Atlas tiles are a mix:{" "}
         <span className="text-[var(--color-finalized)] font-mono">{realCount} real</span>{" "}
-        reference radiographs (CC BY / CC BY-SA, sourced from the{" "}
+        reference radiographs (CC BY / CC BY-SA from the{" "}
         <a
           href="https://zenodo.org/records/19051776"
           target="_blank"
@@ -358,12 +358,13 @@ export function AtlasGrid({ entries }: { entries: AtlasEntry[] }) {
         >
           VetXRay Zenodo dataset
         </a>{" "}
-        and Wikimedia Commons) and{" "}
+        + Wikimedia Commons + anonymized CUVET teaching cases) and{" "}
         <span className="text-[var(--color-tool-violet)] font-mono">{aiCount} AI-illustrative</span>{" "}
         placeholders (Pollinations.ai Flux), flagged for upgrade to real CC-BY images as we find them.
         Real-reference tiles carry a{" "}
-        <span className="text-[var(--color-finalized)] font-mono">✓ Peer-reviewed</span> or{" "}
-        <span className="text-[var(--color-finalized)] font-mono">✓ Community</span> badge;
+        <span className="text-[var(--color-finalized)] font-mono">✓ Peer-reviewed</span>,{" "}
+        <span className="text-[var(--color-finalized)] font-mono">✓ Community</span>, or{" "}
+        <span className="text-[var(--color-finalized)] font-mono">✓ CUVET</span> badge;
         AI-illustrative tiles keep the{" "}
         <span className="text-[var(--color-tool-violet)] font-mono">🤖 AI-gen</span> badge.
         Trust the badge, not the filename.{" "}

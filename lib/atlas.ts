@@ -104,6 +104,14 @@ const POLLINATIONS_ATTR = "Generated via Pollinations.ai Flux model";
 const ATTR_VETXRAY =
   "VetXRay — 9,882 manually annotated canine and feline thoracic radiographs · Zenodo · DOI:10.5281/zenodo.19051776 · CC BY 4.0";
 
+// CUVET teaching cases attribution — kept verbatim across atlas entries
+// AND lib/cuvet-internal.ts so audit grep can find one canonical string.
+// Per Aj. Ekkapol approval 2026-05-26: anonymized derivatives only,
+// PII burn-in scrubbed via the full-width top + bottom band mask (see
+// scratch/cuvet-triage-2026-05-26/scrub_synapse.py).
+const ATTR_CUVET_INTERNAL =
+  "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission";
+
 export const ATLAS_ENTRIES: AtlasEntry[] = [
   {
     id: "atlas-001",
@@ -322,6 +330,123 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
     license: POLLINATIONS_LICENSE,
     attribution: POLLINATIONS_ATTR,
     credibility: "ai-generated",
+  },
+
+  // ────────────────────────────────────────────────────────────────
+  // CUVET teaching cases — Batch 01 (5 entries · added 2026-05-26)
+  //
+  // Source: CUVET Small Animal Hospital · Fujifilm Synapse 5 PACS export.
+  // Approval: Aj. Ekkapol Akkraputtiporn (DI Unit) — verbal sign-off.
+  // PII scrub: full-width top + bottom band mask (see scrub_synapse.py).
+  // Pre-deploy QA: 4-pass recheck (mean+max black assertion on mask
+  //   bands + parent visual re-Read of each file at /public/atlas/).
+  // ────────────────────────────────────────────────────────────────
+  {
+    id: "atlas-cuvet-001",
+    slug: "cuvet-canine-pelvis-vd-001",
+    modality: "DX",
+    species: "canine",
+    body_part: "pelvis",
+    view: "VD",
+    description:
+      "Canine extended-leg ventrodorsal pelvis from the CUVET teaching set. Symmetric femoral-head placement in acetabula — Norberg-angle baseline view. Right-side anatomy marker (R) visible.",
+    learning_landmarks: [
+      "Femoral head + neck",
+      "Acetabular rim (cranial + caudal)",
+      "Obturator foramen",
+      "Sacroiliac joints",
+      "Iliac wings (cropped at upper mask)",
+      "R anatomy marker",
+    ],
+    image_path: "/atlas/cuvet-canine-pelvis-vd-001.png",
+    license: "Educational use, CUVET-internal",
+    attribution: ATTR_CUVET_INTERNAL,
+    credibility: "cuvet-internal",
+  },
+  {
+    id: "atlas-cuvet-002",
+    slug: "cuvet-feline-skull-dv-001",
+    modality: "DX",
+    species: "feline",
+    body_part: "skull",
+    view: "DV",
+    description:
+      "Feline dorsoventral skull from the CUVET teaching set. Symmetric tympanic bullae, dental arcades and zygomatic arches in plain view. Lead L-marker visible top-left.",
+    learning_landmarks: [
+      "Tympanic bullae (paired, symmetric)",
+      "Zygomatic arches",
+      "Maxillary + mandibular dental arcades",
+      "Nasal cavity midline",
+      "Cranial vault outline",
+    ],
+    image_path: "/atlas/cuvet-feline-skull-dv-001.png",
+    license: "Educational use, CUVET-internal",
+    attribution: ATTR_CUVET_INTERNAL,
+    credibility: "cuvet-internal",
+  },
+  {
+    id: "atlas-cuvet-003",
+    slug: "cuvet-feline-skull-lat-001",
+    modality: "DX",
+    species: "feline",
+    body_part: "skull",
+    view: "lateral",
+    description:
+      "Feline lateral skull from the CUVET teaching set. Brachycephalic conformation — shortened muzzle, prominent globe outlines. Useful contrast against the dolichocephalic canine lateral for breed-shape comparison.",
+    learning_landmarks: [
+      "Calvarium / cranial vault",
+      "Frontal sinus (small in brachycephalic cats)",
+      "Maxilla + mandible (shortened)",
+      "Dental arcades (compressed)",
+      "Tympanic bullae (superimposed)",
+    ],
+    image_path: "/atlas/cuvet-feline-skull-lat-001.png",
+    license: "Educational use, CUVET-internal",
+    attribution: ATTR_CUVET_INTERNAL,
+    credibility: "cuvet-internal",
+  },
+  {
+    id: "atlas-cuvet-004",
+    slug: "cuvet-canine-skull-lat-001",
+    modality: "DX",
+    species: "canine",
+    body_part: "skull",
+    view: "lateral",
+    description:
+      "Canine lateral skull from the CUVET teaching set. Mesocephalic conformation — elongated muzzle, complete adult dental arcades visible.",
+    learning_landmarks: [
+      "Calvarium / cranial vault",
+      "Frontal sinus",
+      "Maxilla + mandible (elongated)",
+      "Complete adult dentition",
+      "Tympanic bullae",
+    ],
+    image_path: "/atlas/cuvet-canine-skull-lat-001.png",
+    license: "Educational use, CUVET-internal",
+    attribution: ATTR_CUVET_INTERNAL,
+    credibility: "cuvet-internal",
+  },
+  {
+    id: "atlas-cuvet-005",
+    slug: "cuvet-canine-thorax-lat-001",
+    modality: "DX",
+    species: "canine",
+    body_part: "thorax",
+    view: "lateral",
+    description:
+      "Canine lateral thorax from the CUVET teaching set. Cardiac silhouette, tracheal column, and diaphragmatic line in profile — VHS-compatible view for vertebral heart score practice (canine reference range 8.5–10.5).",
+    learning_landmarks: [
+      "Cardiac silhouette",
+      "Tracheal column",
+      "Carina",
+      "Diaphragmatic line",
+      "Caudal vena cava",
+      "Vertebral bodies (T4 onwards)",
+    ],
+    image_path: "/atlas/cuvet-canine-thorax-lat-001.png",
+    license: "Educational use, CUVET-internal",
+    attribution: ATTR_CUVET_INTERNAL,
+    credibility: "cuvet-internal",
   },
 ];
 

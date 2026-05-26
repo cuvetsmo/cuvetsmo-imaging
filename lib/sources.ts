@@ -147,21 +147,21 @@ export const SOURCES: DataSource[] = [
   // ──────────────────────────────────────────────────────────────
   {
     id: "cuvet-internal-teaching",
-    title: "CUVET Small Animal Hospital — teaching cases (pending Aj. approval)",
+    title: "CUVET Small Animal Hospital — anonymized teaching cases",
     attribution:
       "Small Animal Hospital of Chulalongkorn University · DI Unit · advisor ผศ. เอกพล อัครพุทธิพร",
-    // No public URL — internal hospital workstation source.
+    // Internal hospital source — no public URL.
     url: "/sources#cuvet-internal-teaching",
-    license: "Educational use, per-case Aj. consent + PII scrub required",
-    tier: "pending",
+    license: "Educational use, anonymized with Aj. approval",
+    tier: "ship",
     summary:
-      "Radiograph and ultrasound exports from the CUVET PACS (Fujifilm Synapse 5), curated for veterinary student teaching. Cases ship one by one as each clears (1) Aj. Ekkapol sign-off, (2) PII burn-in scrub, (3) anonymized filename rename.",
+      "Radiograph exports from the CUVET PACS (Fujifilm Synapse 5), anonymized via full-width top + bottom band PII scrub. Each batch goes through a 4-pass QA pipeline before any byte ships: (1) scrub, (2) mask black-band assertion, (3) re-open + visual recheck of the file at its production path, (4) post-deploy live curl.",
     how_we_use_it:
-      "Reserved for Norberg / VHS / case-of-the-week teaching surfaces. Until approval lands the lib/cuvet-internal.ts case array is empty — the type system and badge are wired so adding a case is a 1-PR append.",
-    surfaces: ["Cases (future)", "Atlas (future)", "Norberg ground truth (future)"],
+      "Batch 01 (2026-05-26) ships 5 atlas entries: 1 canine pelvic VD (Norberg baseline), 1 feline + 1 canine lateral skull (dental anatomy), 1 feline DV skull, 1 canine lateral thorax (VHS-compatible). Future batches add Norberg-ground-truth cases as Aj. sign-off lands per-case.",
+    surfaces: ["Atlas (batch 01)", "Cases (future)", "Norberg ground truth (future)"],
     last_verified: "2026-05-26",
     redistribution_note:
-      "Patient data is NEVER mirrored to git or to public storage. Anonymized derivatives land under /public/cases/cuvet-internal/<slug>/ on a per-case basis after written or verbal Aj. sign-off.",
+      "Only anonymized derivatives ship — patient name + HN + date + hospital line + side text are removed in scrub. Raw PNG bytes from the hospital dump are gitignored at the source. See scratch/cuvet-triage-2026-05-26/ for the pipeline scripts (local-only).",
   },
 ];
 
