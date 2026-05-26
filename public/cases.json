@@ -870,5 +870,136 @@
       ],
       "citation": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission"
     }
+  },
+  {
+    "id": "cuvet-thorax-lat-001-uuid-2026-05-26",
+    "slug": "cuvet-canine-thorax-lat-001",
+    "title": "Canine lateral thorax · VHS practice (CUVET)",
+    "species": "canine",
+    "signalment": "Dog · breed unknown · CUVET teaching set",
+    "history": "Lateral thoracic radiograph from the CUVET teaching archive. Cardiac silhouette, tracheal column, and diaphragmatic line in profile — VHS-compatible view. Image anonymized via the CUVET 4-pass scrubber pipeline.",
+    "body_part": "thorax",
+    "modality": "DX",
+    "difficulty": "intro",
+    "learning_objectives": [
+      "ฝึก 📐 VHS 6-click workflow บนภาพจริงจาก CUVET PACS",
+      "สังเกต cardiac silhouette + vertebral body landmarks เริ่มที่ T4",
+      "เทียบ VHS ที่วัดได้กับ canine reference 8.5–10.5 (Buchanan & Bücheler 1995)",
+      "ลอง 🪄 Auto preset ดู cardiac contrast",
+      "ลอง drag จุดที่วางผิดเพื่อปรับ — ไม่ต้องเริ่มใหม่"
+    ],
+    "credibility": "cuvet-internal",
+    "license": "Educational use, CUVET-internal · anonymized with Aj. approval",
+    "source_url": "https://imaging.cuvetsmo.com/sources#cuvet-internal-teaching",
+    "attribution": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission",
+    "files": [
+      {
+        "view_name": "Lateral",
+        "path": "cuvet-canine-thorax-lat-001/LAT.dcm"
+      }
+    ],
+    "recall": {
+      "findings": [
+        "Cardiac silhouette visible in lateral profile",
+        "Tracheal column visible dorsal to heart",
+        "Diaphragmatic line visible",
+        "Vertebral bodies counted from T4 onwards"
+      ],
+      "ddx": [],
+      "final_diagnosis": "Lateral thoracic projection — VHS measurement practice (no formal radiologist read available for this anonymized case)",
+      "teaching_points": [
+        "Canine VHS reference 8.5–10.5 (Buchanan & Bücheler 1995)",
+        "Long-axis from carina to apex; short-axis perpendicular at widest point",
+        "Sum vertebral lengths starting at T4 cranial edge",
+        "Breed conformation modifies the upper bound — Labradors and barrel-chested breeds can sit 10.5–11 while normal"
+      ],
+      "citation": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission"
+    }
+  },
+  {
+    "id": "cuvet-pelvis-stifle-vd-001-uuid-2026-05-26",
+    "slug": "cuvet-canine-pelvis-stifle-vd-001",
+    "title": "Canine pelvis + bilateral stifle VD (CUVET)",
+    "species": "canine",
+    "signalment": "Dog · breed unknown · CUVET teaching set",
+    "history": "Ventrodorsal pelvis extended caudally to capture both stifle joints — femoral condyles, tibial plateaus, and fabellae visible on both sides. Useful for stifle-symmetry screening and as a one-image hindlimb reference. Image anonymized via the CUVET 4-pass scrubber pipeline.",
+    "body_part": "pelvis",
+    "modality": "DX",
+    "difficulty": "intermediate",
+    "learning_objectives": [
+      "วัด Norberg angle บนทั้งสองข้างแล้วเปรียบเทียบ symmetry",
+      "ระบุ landmarks ของ stifle: femoral condyles · tibial plateau · fabellae",
+      "ลอง 📏 Length tool: วัดระยะ joint space เทียบสองข้าง",
+      "ฝึกอ่าน asymmetry signals ที่อาจชี้ pathology แม้ค่าเดี่ยวจะปกติ"
+    ],
+    "credibility": "cuvet-internal",
+    "license": "Educational use, CUVET-internal · anonymized with Aj. approval",
+    "source_url": "https://imaging.cuvetsmo.com/sources#cuvet-internal-teaching",
+    "attribution": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission",
+    "files": [
+      {
+        "view_name": "VD",
+        "path": "cuvet-canine-pelvis-stifle-vd-001/VD.dcm"
+      }
+    ],
+    "recall": {
+      "findings": [
+        "Bilateral femoral heads in acetabula",
+        "Bilateral stifle joints visible (femorotibial articulation)",
+        "Fabellae visible behind both stifles",
+        "Pelvic landmarks symmetric on visual inspection"
+      ],
+      "ddx": [],
+      "final_diagnosis": "Combined pelvis + bilateral stifle VD — measurement practice (no formal radiologist read for this anonymized case)",
+      "teaching_points": [
+        "Norberg reference cut-offs: ≥105° normal · 95–105° borderline · <95° dysplastic",
+        "Stifle symmetry between left and right is itself a screening signal — compare joint spaces and fabella positions",
+        "Extended-leg position is required for accurate Norberg; this is a single-image hindlimb reference, not a substitute for dedicated stifle laterals"
+      ],
+      "citation": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission"
+    }
+  },
+  {
+    "id": "cuvet-abdomen-lat-001-uuid-2026-05-26",
+    "slug": "cuvet-canine-abdomen-lat-001",
+    "title": "Canine lateral abdomen (CUVET)",
+    "species": "canine",
+    "signalment": "Dog · breed unknown · CUVET teaching set",
+    "history": "Lateral abdominal radiograph from the CUVET teaching archive. Vertebral column dorsally, intestinal pattern and serosal silhouettes ventrally, pelvic inlet caudally. Image anonymized via the CUVET 4-pass scrubber pipeline.",
+    "body_part": "abdomen",
+    "modality": "DX",
+    "difficulty": "intro",
+    "learning_objectives": [
+      "ฝึกอ่าน serosal detail + bowel gas pattern บนภาพจริง",
+      "ระบุ vertebral column · diaphragm · pelvic inlet เป็น landmark boundaries",
+      "ลอง 📏 Length tool: วัด vertebral body หรือ kidney shadow ถ้าเห็น",
+      "เทียบกับ VD view ที่ /cases/cuvet-canine-pelvis-stifle-vd-001"
+    ],
+    "credibility": "cuvet-internal",
+    "license": "Educational use, CUVET-internal · anonymized with Aj. approval",
+    "source_url": "https://imaging.cuvetsmo.com/sources#cuvet-internal-teaching",
+    "attribution": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission",
+    "files": [
+      {
+        "view_name": "Lateral",
+        "path": "cuvet-canine-abdomen-lat-001/LAT.dcm"
+      }
+    ],
+    "recall": {
+      "findings": [
+        "Vertebral column visible across dorsal aspect",
+        "Diaphragm + caudal liver silhouette visible cranially",
+        "Mixed bowel gas pattern across mid-abdomen",
+        "Pelvic inlet visible at caudal margin"
+      ],
+      "ddx": [],
+      "final_diagnosis": "Lateral abdomen — anatomical reference (no formal radiologist read for this anonymized case)",
+      "teaching_points": [
+        "Lateral + VD pair is the standard 2-view abdomen — one view alone misses lateralized findings",
+        "Serosal detail depends on intra-abdominal fat; thin patients show less contrast naturally",
+        "Always trace organ outlines systematically: liver → stomach → small bowel → colon → bladder → kidneys"
+      ],
+      "citation": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission"
+    }
   }
 ]
