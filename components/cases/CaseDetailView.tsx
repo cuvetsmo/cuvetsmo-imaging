@@ -15,6 +15,7 @@ import { RecallInputCard } from './RecallInputCard';
 import { RevealedCard } from './RevealedCard';
 import { DDxRankerCard } from './DDxRankerCard';
 import { LesionSpotCard } from './LesionSpotCard';
+import { RelatedCases } from './RelatedCases';
 import type { Box } from '@/lib/scoring/iou';
 
 const DicomViewport = lazy(() => import('@/components/lab/DicomViewport.jsx'));
@@ -98,6 +99,10 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [caseMeta, setCaseMeta] = useState<ImagingCase | null>(null);
   const [files, setFiles] = useState<File[]>([]);
+  // Full catalog kept in state so the RelatedCases widget can score
+  // candidates client-side without a second fetch. Loaded together
+  // with the case index.
+  const [catalog, setCatalog] = useState<ImagingCase[]>([]);
 
   // ── active recall workflow state ──
   const [mode, setMode] = useState<Mode>('recall');
@@ -136,7 +141,10 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
           if (!cancelled) setStatus('not-found');
           return;
         }
-        if (!cancelled) setCaseMeta(meta);
+        if (!cancelled) {
+          setCaseMeta(meta);
+          setCatalog(idx);
+        }
 
         // Fetch each .dcm file as a Blob → File so it slots into the
         // viewer's File-based API directly. Cap at 2 files per existing
@@ -551,6 +559,15 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
             <div className="text-[var(--color-text-faint)] text-[10px] mt-1">{caseMeta.attribution}</div>
           )}
         </footer>
+      )}
+
+      {caseMeta && catalog.length > 0 && (
+        <RelatedCases
+          currentSlug={caseMeta.slug}
+          bodyPart={caseMeta.body_part}
+          species={caseMeta.species}
+          catalog={catalog}
+        />
       )}
     </div>
   );
