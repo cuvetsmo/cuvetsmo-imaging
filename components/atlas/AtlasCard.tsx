@@ -46,10 +46,11 @@ export function AtlasCard({ entry }: { entry: AtlasEntry }) {
           {entry.modality} · {entry.view}
         </div>
         {/* Credibility honesty badge — bottom-right, ALWAYS rendered for
-            visual parity. Real entries (peer-reviewed / community) get a
-            cyan/green checkmark; ai-generated gets the violet 🤖 AI-gen
-            badge. Same position so students can scan the corner once
-            and know what they're looking at. */}
+            visual parity. Peer-reviewed gets a cyan checkmark; community /
+            open-textbook / cuvet-internal get a green checkmark. Atlas is
+            100% real (Phase 13 / 21) so there's no AI badge branch.
+            Same position so students can scan the corner once and know
+            what they're looking at. */}
         {cred && (
           <div
             className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded bg-[rgba(0,0,0,0.7)] backdrop-blur-sm px-1.5 py-0.5 text-[9px] uppercase tracking-wider border font-mono"

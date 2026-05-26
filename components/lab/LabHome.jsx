@@ -1039,7 +1039,7 @@ export default function LabHome() {
               desc="Curated CC-BY radiographs across X-ray, CT, MR, US"
               meta="16 cases, grows weekly"
               art={
-                /* Real Pollinations-generated canine skeleton lateral · cropped to fit tile */
+                /* Real anonymized CUVET canine thorax lateral · cropped to fit tile */
                 <div className="relative w-[110px] h-[68px] rounded-md overflow-hidden bg-black ring-1 ring-[var(--color-border-bright)]">
                   <Image
                     src="/illustrations/tile-cases.jpg"
@@ -1057,7 +1057,7 @@ export default function LabHome() {
               desc="Anki-style masks · cover-the-anatomy active recall"
               meta="works on PNG + DICOM"
               art={
-                /* Real radiograph base + SVG occlusion masks overlaid · shows the tool's actual behavior */
+                /* Real anonymized CUVET canine skull lateral + SVG occlusion masks overlaid */
                 <div className="relative w-[110px] h-[68px] rounded-md overflow-hidden bg-black ring-1 ring-[var(--color-border-bright)]">
                   <Image
                     src="/illustrations/tile-occlusion.jpg"
@@ -1179,13 +1179,14 @@ function ViewerPreview() {
         </div>
       </div>
 
-      {/* Viewport · real radiograph image + measurement overlay drawn on top.
-          The image is an AI-generated stylised canine lateral (Pollinations.ai
-          Flux seed=11) showing dog body w/ ribcage + spine + pelvis visible.
-          Not a true diagnostic radiograph — "Sample · Illustrative" badge
-          makes this explicit. Overlay coordinates tuned to the visible pelvis
-          area (lower-left) of the lateral image; easy to nudge if the source
-          image is swapped later. */}
+      {/* Viewport · REAL anonymized CUVET canine pelvic VD + measurement overlay
+          drawn on top. Image sourced from /atlas/cuvet-canine-pelvis-vd-001.png
+          (the same scrubbed radiograph used in the atlas + cases · 4-pass QA +
+          17-tag PII assertion clean · Aj. Ekkapol approved). Overlay
+          coordinates tuned to the visible femoral heads + acetabular rims of
+          the pelvic VD in this image with object-position center-top so the
+          pelvis stays anchored at the top of the cropped frame.
+          Iron Rule 0 — Phase 21: no AI imagery in any production surface. */}
       <div className="relative aspect-[5/4] bg-[var(--color-surface-3)]">
         {/* Base radiograph image */}
         <Image
@@ -1193,7 +1194,7 @@ function ViewerPreview() {
           alt=""
           fill
           sizes="(min-width: 1024px) 480px, 100vw"
-          className="object-cover"
+          className="object-cover object-[center_top]"
           priority
         />
 
@@ -1215,29 +1216,31 @@ function ViewerPreview() {
           </defs>
           <rect width="500" height="400" fill="url(#overlay-vignette)" />
 
-          {/* Norberg overlay — femoral heads + acetabular rims positioned
-              over the visible pelvis area in the lower-left of the image.
-              Not anatomically rigorous (the image is lateral, Norberg needs
-              VD); kept as a stylised "this is what the tool does" demo. */}
-          {/* Cyan baseline · femoral head to femoral head */}
-          <line x1="105" y1="245" x2="170" y2="245" stroke="#5ACCE6" strokeWidth="2" />
-          {/* Angle lines · femoral head → acetabular rim */}
-          <line x1="105" y1="245" x2="88" y2="220" stroke="#5ACCE6" strokeWidth="2" />
-          <line x1="170" y1="245" x2="187" y2="220" stroke="#5ACCE6" strokeWidth="2" />
+          {/* Norberg overlay — anatomically aligned to the visible pelvis
+              in the real CUVET pelvic VD radiograph (object-position top
+              keeps pelvis anchored to top of frame). Coordinates target
+              the femoral heads + acetabular rims as they actually appear.
+              Numeric readouts are illustrative ("look, this is what the
+              tool computes") · not ground truth for this specific image. */}
+          {/* Cyan baseline · femoral head to femoral head (horizontal) */}
+          <line x1="180" y1="205" x2="320" y2="205" stroke="#5ACCE6" strokeWidth="2" />
+          {/* Angle lines · femoral head → cranio-lateral acetabular rim */}
+          <line x1="180" y1="205" x2="155" y2="178" stroke="#5ACCE6" strokeWidth="2" />
+          <line x1="320" y1="205" x2="345" y2="178" stroke="#5ACCE6" strokeWidth="2" />
           {/* Acetabular rim dots */}
-          <circle cx="88" cy="220" r="3.5" fill="#5ACCE6" />
-          <circle cx="187" cy="220" r="3.5" fill="#5ACCE6" />
+          <circle cx="155" cy="178" r="3.5" fill="#5ACCE6" />
+          <circle cx="345" cy="178" r="3.5" fill="#5ACCE6" />
           {/* Femoral head center dots */}
-          <circle cx="105" cy="245" r="3.5" fill="#5ACCE6" />
-          <circle cx="170" cy="245" r="3.5" fill="#5ACCE6" />
+          <circle cx="180" cy="205" r="3.5" fill="#5ACCE6" />
+          <circle cx="320" cy="205" r="3.5" fill="#5ACCE6" />
           {/* Angle arcs */}
-          <path d="M 120 233 A 14 14 0 0 0 117 244" fill="none" stroke="#5ACCE6" strokeWidth="1.5" />
-          <path d="M 155 233 A 14 14 0 0 1 158 244" fill="none" stroke="#5ACCE6" strokeWidth="1.5" />
+          <path d="M 200 192 A 18 18 0 0 0 196 204" fill="none" stroke="#5ACCE6" strokeWidth="1.5" />
+          <path d="M 300 192 A 18 18 0 0 1 304 204" fill="none" stroke="#5ACCE6" strokeWidth="1.5" />
 
-          {/* Numeric readouts — floated above the angle area, drop-shadow for contrast */}
+          {/* Numeric readouts — illustrative angles bracketing the ≥105° normal cut-off */}
           <g fontFamily="ui-monospace, monospace" fontWeight="600">
-            <text x="35" y="208" fontSize="12" fill="#5ACCE6">L: 108°</text>
-            <text x="200" y="208" fontSize="12" fill="#5ACCE6">R: 105°</text>
+            <text x="55" y="168" fontSize="12" fill="#5ACCE6">L: 108°</text>
+            <text x="370" y="168" fontSize="12" fill="#5ACCE6">R: 105°</text>
           </g>
 
           {/* Top-left DICOM metadata · monospace, kept on dark area */}
@@ -1264,11 +1267,11 @@ function ViewerPreview() {
           <text x="420" y="395" textAnchor="middle" fontSize="9" fontFamily="ui-monospace, monospace" fill="#D4D4D8">10 mm</text>
         </svg>
 
-        {/* Floating "Sample · Illustrative" badge — makes it explicit the image
-            is AI-generated, not a real diagnostic radiograph. */}
+        {/* Floating badge — real anonymized CUVET radiograph + illustrative
+            overlay (numbers are demo values, not a published radiologist read). */}
         <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded bg-[rgba(0,0,0,0.7)] backdrop-blur-sm px-2 py-1 text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] border border-[var(--color-border-bright)]">
-          <span className="inline-flex h-1.5 w-1.5 rounded-full bg-[var(--color-tool-cyan)]" aria-hidden />
-          Sample · Illustrative
+          <span className="inline-flex h-1.5 w-1.5 rounded-full bg-[var(--color-finalized)]" aria-hidden />
+          CUVET radiograph · demo overlay
         </div>
       </div>
 

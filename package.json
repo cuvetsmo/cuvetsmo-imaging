@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
-    "prebuild": "node --experimental-strip-types scripts/sync-cases-json.mjs",
+    "prebuild": "node --experimental-strip-types scripts/sync-cases-json.mjs && node scripts/lint-iron-rule-0.mjs",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "lint:iron-rule-0": "node scripts/lint-iron-rule-0.mjs",
     "sync:cases": "node --experimental-strip-types scripts/sync-cases-json.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
