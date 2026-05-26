@@ -359,8 +359,8 @@ export function AtlasGrid({ entries }: { entries: AtlasEntry[] }) {
         <span className="text-[var(--color-text-muted)]">
           Coverage gaps we openly track:
         </span>{" "}
-        cervical spine (C1–C7), elbow —
-        unfilled until real CC-BY images land.
+        cervical spine (C1–C7), stifle (lateral) —
+        unfilled until real images land.
         Trust the badge, not the filename.{" "}
         <a
           href="/sources"

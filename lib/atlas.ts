@@ -241,8 +241,7 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
       "Acetabular rim (cranial + caudal)",
       "Obturator foramen",
       "Sacroiliac joints",
-      "Iliac wings (cropped at upper mask)",
-      "R anatomy marker",
+      "R anatomy marker (mid-left)",
     ],
     image_path: "/atlas/cuvet-canine-pelvis-vd-001.png",
     license: "Educational use, CUVET-internal",
@@ -264,6 +263,7 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
       "Maxillary + mandibular dental arcades",
       "Nasal cavity midline",
       "Cranial vault outline",
+      "Lead L marker (CUVET institutional, top-left)",
     ],
     image_path: "/atlas/cuvet-feline-skull-dv-001.png",
     license: "Educational use, CUVET-internal",
@@ -400,12 +400,12 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
     description:
       "Canine thoraco-lumbar spine VD from the CUVET teaching set. Full thoracic + lumbar vertebral column with ribs symmetric on both sides — useful for screening alignment, intervertebral disc space uniformity, and vertebral body shape.",
     learning_landmarks: [
-      "Thoracic vertebrae (T1–T13)",
-      "Lumbar vertebrae (L1–L7)",
+      "Thoracic vertebrae (T-row, ribs attached)",
+      "Lumbar vertebrae (cranial portion visible)",
       "Ribs (paired, symmetric)",
       "Intervertebral disc spaces",
-      "Spinous processes (midline)",
-      "L CUVET anatomy marker",
+      "Spinous processes (midline column of densities)",
+      "L CUVET anatomy marker (top-right)",
     ],
     image_path: "/atlas/cuvet-canine-spine-tl-vd-001.png",
     license: "Educational use, CUVET-internal",
@@ -430,6 +430,88 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
       "Stifle joint space (paired)",
     ],
     image_path: "/atlas/cuvet-canine-pelvis-stifle-vd-001.png",
+    license: "Educational use, CUVET-internal",
+    attribution: ATTR_CUVET_INTERNAL,
+    credibility: "cuvet-internal",
+  },
+
+  // ────────────────────────────────────────────────────────────────
+  // CUVET teaching cases — Batch 03 (3 entries · added 2026-05-26)
+  //
+  // Closes the elbow gap that the previous footnote disclosed.
+  // Adds a forelimb (radius/ulna/carpus) view and a CUVET thorax VD
+  // to pair with the existing CUVET thorax lateral.
+  //
+  // Iron Rule 0 catch during Pass-3 visual recheck: cell-0083 was
+  // initially classified as "stifle lateral" based on bucket sampling,
+  // but the visible body-wall attachment on the right + ~110°
+  // flexion angle + prominent olecranon process behind the joint
+  // confirmed it's an ELBOW lateral. Reclassified before atlas entry
+  // was written. This catch is why Pass-3 visual review is non-
+  // optional — pixel-band assertion alone would never have caught it.
+  // ────────────────────────────────────────────────────────────────
+  {
+    id: "atlas-cuvet-010",
+    slug: "cuvet-canine-forelimb-lat-001",
+    modality: "DX",
+    species: "canine",
+    body_part: "limb-fore",
+    view: "lateral",
+    description:
+      "Canine lateral antebrachium (radius + ulna) and carpus from the CUVET teaching set. Full forearm shaft visible with the carpal joints at the distal end. Reference for forelimb-shaft alignment and carpal-row anatomy.",
+    learning_landmarks: [
+      "Radius (cranial bone, slimmer)",
+      "Ulna (caudal bone, with olecranon proximally)",
+      "Antebrachiocarpal joint (distal radius)",
+      "Carpal bones (proximal + distal rows)",
+      "Metacarpal bases",
+      "R anatomy marker (top-left)",
+    ],
+    image_path: "/atlas/cuvet-canine-forelimb-lat-001.png",
+    license: "Educational use, CUVET-internal",
+    attribution: ATTR_CUVET_INTERNAL,
+    credibility: "cuvet-internal",
+  },
+  {
+    id: "atlas-cuvet-011",
+    slug: "cuvet-canine-elbow-lat-001",
+    modality: "DX",
+    species: "canine",
+    body_part: "limb-fore",
+    view: "lateral",
+    description:
+      "Canine lateral elbow (humero-radio-ulnar joint) from the CUVET teaching set. Joint flexed at ~110° in this projection, with the humeral condyle proximally, anconeal process projecting behind the joint, and radius + ulna distally. Body-wall shadow visible caudoventrally (right side of image).",
+    learning_landmarks: [
+      "Humeral condyle (proximal articular surface)",
+      "Anconeal process (ulna, behind joint)",
+      "Olecranon (proximal ulna)",
+      "Radial head (cranial articulation)",
+      "Radius + ulna distal to joint",
+      "Body-wall silhouette (caudo-distal)",
+    ],
+    image_path: "/atlas/cuvet-canine-elbow-lat-001.png",
+    license: "Educational use, CUVET-internal",
+    attribution: ATTR_CUVET_INTERNAL,
+    credibility: "cuvet-internal",
+  },
+  {
+    id: "atlas-cuvet-012",
+    slug: "cuvet-canine-thorax-vd-001",
+    modality: "DX",
+    species: "canine",
+    body_part: "thorax",
+    view: "VD",
+    description:
+      "Canine ventrodorsal thorax from the CUVET teaching set. Symmetric ribs left + right of midline, cardiac silhouette centred, spine running down midline. Pair with cuvet-canine-thorax-lat-001 for two-plane thoracic evaluation.",
+    learning_landmarks: [
+      "Cardiac silhouette (centred over spine)",
+      "Left + right lung fields",
+      "Ribs (paired, symmetric)",
+      "Sternum (overlies spine on VD)",
+      "Diaphragmatic dome",
+      "L anatomy marker (top-right)",
+    ],
+    image_path: "/atlas/cuvet-canine-thorax-vd-001.png",
     license: "Educational use, CUVET-internal",
     attribution: ATTR_CUVET_INTERNAL,
     credibility: "cuvet-internal",

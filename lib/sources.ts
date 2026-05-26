@@ -155,10 +155,10 @@ export const SOURCES: DataSource[] = [
     license: "Educational use, anonymized with Aj. approval",
     tier: "ship",
     summary:
-      "Radiograph exports from the CUVET PACS (Fujifilm Synapse 5), anonymized via full-width top + bottom band PII scrub. Each batch goes through a 4-pass QA pipeline before any byte ships: (1) scrub, (2) mask black-band assertion, (3) re-open + visual recheck of the file at its production path, (4) post-deploy live curl.",
+      "Radiograph exports from the CUVET PACS (Fujifilm Synapse 5), anonymized via full-width top + bottom band PII scrub. Each batch goes through a 4-pass QA pipeline before any byte ships: (1) scrub, (2) mask black-band assertion, (3) re-open + visual recheck of the file at its production path (Iron Rule 0 — caught a stifle/elbow misclassification on batch 03), (4) post-deploy live curl.",
     how_we_use_it:
-      "Batch 01 (2026-05-26) ships 5 atlas entries: 1 canine pelvic VD (Norberg baseline), 1 feline + 1 canine lateral skull (dental anatomy), 1 feline DV skull, 1 canine lateral thorax (VHS-compatible). Future batches add Norberg-ground-truth cases as Aj. sign-off lands per-case.",
-    surfaces: ["Atlas (batch 01)", "Cases (future)", "Norberg ground truth (future)"],
+      "Three batches shipped on 2026-05-26: 12 atlas entries spanning canine pelvic VD (Norberg baseline) · canine + feline skull views · canine thorax lat + VD · canine abdomen lat + VD · canine thoraco-lumbar spine VD · canine pelvis-stifle VD · canine forelimb lat · canine elbow lat. Remaining gaps disclosed in the atlas footnote.",
+    surfaces: ["Atlas (12 entries)", "Cases (future)", "Norberg ground truth (future)"],
     last_verified: "2026-05-26",
     redistribution_note:
       "Only anonymized derivatives ship — patient name + HN + date + hospital line + side text are removed in scrub. Raw PNG bytes from the hospital dump are gitignored at the source. See scratch/cuvet-triage-2026-05-26/ for the pipeline scripts (local-only).",
