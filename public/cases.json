@@ -1001,5 +1001,183 @@
       ],
       "citation": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission"
     }
+  },
+  {
+    "id": "cuvet-abdomen-vd-001-uuid-2026-05-26",
+    "slug": "cuvet-canine-abdomen-vd-001",
+    "title": "Canine VD abdomen — paired view (CUVET)",
+    "species": "canine",
+    "signalment": "Dog · breed unknown · CUVET teaching set",
+    "history": "Ventrodorsal abdomen from the CUVET teaching archive — pair view for cuvet-canine-abdomen-lat-001. Lumbar vertebrae down midline, paired renal silhouettes, intestinal gas pattern, sacroiliac + femoral heads at pelvic inlet, L anatomy marker top-right.",
+    "body_part": "abdomen",
+    "modality": "DX",
+    "difficulty": "intro",
+    "learning_objectives": [
+      "ฝึก 2-view abdomen evaluation: เปรียบเทียบกับ /cases/cuvet-canine-abdomen-lat-001",
+      "ระบุ renal silhouettes ที่อยู่ข้างกระดูกสันหลัง L1–L3",
+      "อ่าน L anatomy marker เพื่อยืนยัน orientation",
+      "ลอง 📏 Length tool: วัด renal long-axis (canine kidney ~2.5–3.5 × L2 length)",
+      "สำรวจ bowel pattern เปรียบเทียบ left vs right"
+    ],
+    "credibility": "cuvet-internal",
+    "license": "Educational use, CUVET-internal · anonymized with Aj. approval",
+    "source_url": "https://imaging.cuvetsmo.com/sources#cuvet-internal-teaching",
+    "attribution": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission",
+    "files": [
+      {
+        "view_name": "VD",
+        "path": "cuvet-canine-abdomen-vd-001/VD.dcm"
+      }
+    ],
+    "recall": {
+      "findings": [
+        "Lumbar vertebrae down midline",
+        "Paired renal silhouettes flanking spine",
+        "Mixed bowel gas pattern",
+        "Sacroiliac joints + femoral heads at caudal margin",
+        "L anatomy marker top-right"
+      ],
+      "ddx": [],
+      "final_diagnosis": "VD abdomen — paired-view anatomy reference (no formal radiologist read for this anonymized case)",
+      "teaching_points": [
+        "Renal long-axis : L2 vertebral length ratio is the canonical kidney-size screen (canine 2.5–3.5×)",
+        "VD view reveals lateralized findings that lateral hides (e.g. unilateral renomegaly, asymmetric bowel)",
+        "Always read VD + lateral together — single view = incomplete read"
+      ],
+      "citation": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission"
+    }
+  },
+  {
+    "id": "cuvet-elbow-lat-001-uuid-2026-05-26",
+    "slug": "cuvet-canine-elbow-lat-001",
+    "title": "Canine elbow lateral (CUVET)",
+    "species": "canine",
+    "signalment": "Dog · breed unknown · CUVET teaching set",
+    "history": "Lateral elbow (humero-radio-ulnar joint) from the CUVET teaching archive. Joint flexed at ~110°, with humeral condyle proximally, anconeal process projecting behind the joint, and radius + ulna distally. Body-wall silhouette visible caudo-distally. Image anonymized via the CUVET 4-pass scrubber pipeline.",
+    "body_part": "limb-fore",
+    "modality": "DX",
+    "difficulty": "intermediate",
+    "learning_objectives": [
+      "ระบุ landmarks: humeral condyle · anconeal process · radial head · olecranon",
+      "ลอง 📏 Length tool: วัด joint space ที่ humero-radial articulation",
+      "ลอง 📐 Angle tool: วัดมุม flexion ของ elbow",
+      "สังเกต anatomy marker R/L เพื่อยืนยัน orientation",
+      "เปรียบเทียบกับ /cases/cuvet-canine-forelimb-lat-001 (distal antebrachium pair)"
+    ],
+    "credibility": "cuvet-internal",
+    "license": "Educational use, CUVET-internal · anonymized with Aj. approval",
+    "source_url": "https://imaging.cuvetsmo.com/sources#cuvet-internal-teaching",
+    "attribution": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission",
+    "files": [
+      {
+        "view_name": "Lateral",
+        "path": "cuvet-canine-elbow-lat-001/LAT.dcm"
+      }
+    ],
+    "recall": {
+      "findings": [
+        "Humeral condyle visible as the proximal articular surface",
+        "Anconeal process (ulna) projecting behind the joint space",
+        "Radius head + ulna distal to the joint",
+        "Body-wall silhouette visible caudo-distally (forelimb attachment)"
+      ],
+      "ddx": [],
+      "final_diagnosis": "Lateral elbow — anatomy reference (no formal radiologist read for this anonymized case)",
+      "teaching_points": [
+        "Anconeal process should be smoothly continuous with the olecranon — fragmentation = developmental elbow disease (UAP)",
+        "Joint space should be uniform; asymmetric narrowing is an OA / DJD signal",
+        "Routine elbow exam needs lateral + craniocaudal views — single lateral can hide medial coronoid disease (FCP)"
+      ],
+      "citation": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission"
+    }
+  },
+  {
+    "id": "cuvet-forelimb-lat-001-uuid-2026-05-26",
+    "slug": "cuvet-canine-forelimb-lat-001",
+    "title": "Canine forelimb lateral · antebrachium + carpus (CUVET)",
+    "species": "canine",
+    "signalment": "Dog · breed unknown · CUVET teaching set",
+    "history": "Lateral antebrachium (radius + ulna) and carpus from the CUVET teaching archive. Full forearm shaft visible with carpal joints at the distal end. R anatomy marker top-left.",
+    "body_part": "limb-fore",
+    "modality": "DX",
+    "difficulty": "intro",
+    "learning_objectives": [
+      "ระบุ radius vs ulna (radius = cranial slimmer · ulna = caudal with olecranon proximal end)",
+      "อ่าน carpal-row anatomy: proximal + distal rows · 7 carpal bones",
+      "ลอง 📏 Length tool: วัด radius + ulna shaft lengths (compare ratio)",
+      "เปรียบเทียบกับ /cases/cuvet-canine-elbow-lat-001 (proximal joint pair)"
+    ],
+    "credibility": "cuvet-internal",
+    "license": "Educational use, CUVET-internal · anonymized with Aj. approval",
+    "source_url": "https://imaging.cuvetsmo.com/sources#cuvet-internal-teaching",
+    "attribution": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission",
+    "files": [
+      {
+        "view_name": "Lateral",
+        "path": "cuvet-canine-forelimb-lat-001/LAT.dcm"
+      }
+    ],
+    "recall": {
+      "findings": [
+        "Radius (cranial, slimmer bone)",
+        "Ulna (caudal, with olecranon proximally)",
+        "Antebrachiocarpal joint at distal radius",
+        "Carpal bones in proximal + distal rows",
+        "R anatomy marker top-left"
+      ],
+      "ddx": [],
+      "final_diagnosis": "Lateral antebrachium + carpus — anatomy reference (no formal radiologist read for this anonymized case)",
+      "teaching_points": [
+        "Radius bears most of the axial load; ulna's olecranon transmits triceps pull",
+        "Carpal hyperextension injuries are common in agility / working dogs — palpate joint laxity even when radiograph looks normal",
+        "Growth-plate (physis) timing: distal radial physis closes ~9-12mo in canines · earlier closure = growth disturbance"
+      ],
+      "citation": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission"
+    }
+  },
+  {
+    "id": "cuvet-feline-skull-dv-001-uuid-2026-05-26",
+    "slug": "cuvet-feline-skull-dv-001",
+    "title": "Feline skull DV (CUVET) · first feline DICOM case",
+    "species": "feline",
+    "signalment": "Cat · breed unknown · CUVET teaching set",
+    "history": "Dorsoventral skull from the CUVET teaching archive — first feline DICOM case in the catalog. Symmetric tympanic bullae, dental arcades, zygomatic arches. Lead L marker (CUVET institutional) visible top-left.",
+    "body_part": "skull",
+    "modality": "DX",
+    "difficulty": "intro",
+    "learning_objectives": [
+      "ระบุ feline skull landmarks: tympanic bullae · zygomatic arches · dental arcades",
+      "เปรียบเทียบ symmetry ซ้าย vs ขวา — asymmetry คือ early screening signal",
+      "ลอง 📏 Length tool: วัด zygomatic arch span (breed shape reference)",
+      "อ่าน lead L marker เพื่อยืนยัน orientation (CUVET ใช้ L = animal's left)"
+    ],
+    "credibility": "cuvet-internal",
+    "license": "Educational use, CUVET-internal · anonymized with Aj. approval",
+    "source_url": "https://imaging.cuvetsmo.com/sources#cuvet-internal-teaching",
+    "attribution": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission",
+    "files": [
+      {
+        "view_name": "DV",
+        "path": "cuvet-feline-skull-dv-001/DV.dcm"
+      }
+    ],
+    "recall": {
+      "findings": [
+        "Tympanic bullae paired and symmetric (small ovoid lucencies lateral)",
+        "Zygomatic arches visible bilaterally",
+        "Maxillary + mandibular dental arcades superimposed (DV)",
+        "Nasal cavity midline",
+        "Cranial vault outline",
+        "Lead L marker (CUVET institutional) top-left"
+      ],
+      "ddx": [],
+      "final_diagnosis": "Feline DV skull — anatomy reference (no formal radiologist read for this anonymized case)",
+      "teaching_points": [
+        "Asymmetric tympanic bullae = early sign of otitis media or nasopharyngeal disease",
+        "DV is the standard for bullae comparison; open-mouth view supplements for tympanic detail",
+        "Brachycephalic cats (Persian, Exotic Shorthair) show shortened skulls — breed conformation modifies what 'normal' looks like"
+      ],
+      "citation": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission"
+    }
   }
 ]
