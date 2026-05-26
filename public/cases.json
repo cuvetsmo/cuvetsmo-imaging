@@ -1357,5 +1357,50 @@
       ],
       "citation": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission"
     }
+  },
+  {
+    "id": "cuvet-feline-thorax-lat-001-uuid-2026-05-26",
+    "slug": "cuvet-feline-thorax-lat-001",
+    "title": "Feline lateral thorax · VHS practice (CUVET)",
+    "species": "feline",
+    "signalment": "Cat · breed unknown · CUVET teaching set",
+    "history": "Lateral thoracic radiograph from the CUVET teaching archive. Slim body wall, more horizontal trachea, and elongated cardiac silhouette characteristic of feline conformation. Useful for feline VHS practice (reference 6.7–8.1, Litster & Buchanan 2000) — distinct workflow from canine due to smaller VHS range. Image anonymized via the CUVET 4-pass scrubber pipeline.",
+    "body_part": "thorax",
+    "modality": "DX",
+    "difficulty": "intro",
+    "learning_objectives": [
+      "ฝึก 📐 VHS workflow บน feline anatomy (auto-detect species → feline reference 6.7–8.1)",
+      "เปรียบเทียบ feline vs canine cardiac silhouette shape (elongated vs rounded)",
+      "สังเกต tracheal column ที่ horizontal มากกว่า canine",
+      "ระบุ landmarks: cardiac silhouette · trachea · diaphragm · vertebrae T4 onwards",
+      "เปรียบเทียบกับ /cases/cuvet-canine-thorax-lat-001 (canine equivalent)"
+    ],
+    "credibility": "cuvet-internal",
+    "license": "Educational use, CUVET-internal · anonymized with Aj. approval",
+    "source_url": "https://imaging.cuvetsmo.com/sources#cuvet-internal-teaching",
+    "attribution": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission",
+    "files": [
+      {
+        "view_name": "Lateral",
+        "path": "cuvet-feline-thorax-lat-001/LAT.dcm"
+      }
+    ],
+    "recall": {
+      "findings": [
+        "Cardiac silhouette in feline lateral profile (elongated shape)",
+        "Tracheal column visible (more horizontal than canine)",
+        "Lung fields lucent bilaterally",
+        "Diaphragmatic line visible",
+        "Vertebral bodies visible across dorsal aspect (T4 onwards)"
+      ],
+      "ddx": [],
+      "final_diagnosis": "Feline lateral thorax — VHS measurement practice (no formal radiologist read available for this anonymized case)",
+      "teaching_points": [
+        "Feline VHS reference 6.7–8.1 (Litster & Buchanan 2000) — different from canine range",
+        "\"Valentine heart\" appearance on DV is the HCM tell — but lateral is the VHS workflow standard",
+        "Feline cardiac silhouette has different orientation than canine — measure on the actual long-axis, not assumed orientation"
+      ],
+      "citation": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission"
+    }
   }
 ]
