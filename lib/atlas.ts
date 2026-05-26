@@ -334,6 +334,106 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
     attribution: ATTR_CUVET_INTERNAL,
     credibility: "cuvet-internal",
   },
+
+  // ────────────────────────────────────────────────────────────────
+  // CUVET teaching cases — Batch 02 (4 entries · added 2026-05-26)
+  //
+  // Closes coverage gaps disclosed in the previous atlas footnote:
+  // canine abdomen (lateral + VD) · spine VD · pelvis-stifle VD.
+  // Same 4-pass QA pipeline as batch 01 (mask black assertion +
+  // parent visual recheck at /public/atlas/ + post-deploy curl).
+  // Remaining gaps after this batch: cervical spine (C1-C7), elbow.
+  // ────────────────────────────────────────────────────────────────
+  {
+    id: "atlas-cuvet-006",
+    slug: "cuvet-canine-abdomen-lat-001",
+    modality: "DX",
+    species: "canine",
+    body_part: "abdomen",
+    view: "lateral",
+    description:
+      "Canine lateral abdomen from the CUVET teaching set. Vertebral column dorsally, gas-filled bowel loops + serosal silhouettes ventrally, pelvic inlet caudally. The reference layout for evaluating gas pattern, organ silhouette, and serosal detail.",
+    learning_landmarks: [
+      "Vertebral column (T13–L7)",
+      "Diaphragm (cranial border)",
+      "Liver silhouette (caudal to diaphragm)",
+      "Gastric gas",
+      "Small intestinal loops",
+      "Colon",
+      "Urinary bladder",
+      "Pelvic inlet (caudal limit)",
+    ],
+    image_path: "/atlas/cuvet-canine-abdomen-lat-001.png",
+    license: "Educational use, CUVET-internal",
+    attribution: ATTR_CUVET_INTERNAL,
+    credibility: "cuvet-internal",
+  },
+  {
+    id: "atlas-cuvet-007",
+    slug: "cuvet-canine-abdomen-vd-001",
+    modality: "DX",
+    species: "canine",
+    body_part: "abdomen",
+    view: "VD",
+    description:
+      "Canine ventrodorsal abdomen from the CUVET teaching set. Vertebrae down the midline, symmetric kidneys flanking, intestinal gas patterns, and sacroiliac + femoral heads at the pelvic inlet. Pair with the lateral view for two-plane abdominal evaluation.",
+    learning_landmarks: [
+      "Lumbar vertebrae (midline)",
+      "Renal silhouettes (paired, retroperitoneal)",
+      "Intestinal gas pattern",
+      "Sacroiliac joints",
+      "Femoral heads / pelvic inlet",
+      "L anatomy marker",
+    ],
+    image_path: "/atlas/cuvet-canine-abdomen-vd-001.png",
+    license: "Educational use, CUVET-internal",
+    attribution: ATTR_CUVET_INTERNAL,
+    credibility: "cuvet-internal",
+  },
+  {
+    id: "atlas-cuvet-008",
+    slug: "cuvet-canine-spine-tl-vd-001",
+    modality: "DX",
+    species: "canine",
+    body_part: "spine",
+    view: "VD",
+    description:
+      "Canine thoraco-lumbar spine VD from the CUVET teaching set. Full thoracic + lumbar vertebral column with ribs symmetric on both sides — useful for screening alignment, intervertebral disc space uniformity, and vertebral body shape.",
+    learning_landmarks: [
+      "Thoracic vertebrae (T1–T13)",
+      "Lumbar vertebrae (L1–L7)",
+      "Ribs (paired, symmetric)",
+      "Intervertebral disc spaces",
+      "Spinous processes (midline)",
+      "L CUVET anatomy marker",
+    ],
+    image_path: "/atlas/cuvet-canine-spine-tl-vd-001.png",
+    license: "Educational use, CUVET-internal",
+    attribution: ATTR_CUVET_INTERNAL,
+    credibility: "cuvet-internal",
+  },
+  {
+    id: "atlas-cuvet-009",
+    slug: "cuvet-canine-pelvis-stifle-vd-001",
+    modality: "DX",
+    species: "canine",
+    body_part: "limb-hind",
+    view: "VD",
+    description:
+      "Canine ventrodorsal pelvis + bilateral stifles from the CUVET teaching set. Extends a standard Norberg-positioning VD caudally to capture both femorotibial joints — femoral condyles, tibial plateaus, and fabellae visible on both sides. Useful for stifle symmetry screening and as a one-image hindlimb reference.",
+    learning_landmarks: [
+      "Femoral heads + acetabula (paired)",
+      "Femoral diaphysis (paired)",
+      "Femoral condyles (medial + lateral · paired)",
+      "Tibial plateau (paired)",
+      "Fabellae (medial + lateral sesamoids)",
+      "Stifle joint space (paired)",
+    ],
+    image_path: "/atlas/cuvet-canine-pelvis-stifle-vd-001.png",
+    license: "Educational use, CUVET-internal",
+    attribution: ATTR_CUVET_INTERNAL,
+    credibility: "cuvet-internal",
+  },
 ];
 
 // Helper — lookup by slug. Used by /atlas/[slug] detail route.
