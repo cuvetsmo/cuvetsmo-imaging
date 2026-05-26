@@ -22,7 +22,7 @@
 //     audit complaint).
 //   - Bump `last_verified` to today's date.
 
-export type SourceTier = "ship" | "external";
+export type SourceTier = "ship" | "external" | "pending";
 
 export type DataSource = {
   /** Stable slug used as React key + anchor. */
@@ -141,13 +141,40 @@ export const SOURCES: DataSource[] = [
     redistribution_note:
       "Browser-only viewer with no download function — we link to the live tool.",
   },
+
+  // ──────────────────────────────────────────────────────────────
+  // Tier 3 — Pending approval (transparent placeholder)
+  // ──────────────────────────────────────────────────────────────
+  {
+    id: "cuvet-internal-teaching",
+    title: "CUVET Small Animal Hospital — teaching cases (pending Aj. approval)",
+    attribution:
+      "Small Animal Hospital of Chulalongkorn University · DI Unit · advisor ผศ. เอกพล อัครพุทธิพร",
+    // No public URL — internal hospital workstation source.
+    url: "/sources#cuvet-internal-teaching",
+    license: "Educational use, per-case Aj. consent + PII scrub required",
+    tier: "pending",
+    summary:
+      "Radiograph and ultrasound exports from the CUVET PACS (Fujifilm Synapse 5), curated for veterinary student teaching. Cases ship one by one as each clears (1) Aj. Ekkapol sign-off, (2) PII burn-in scrub, (3) anonymized filename rename.",
+    how_we_use_it:
+      "Reserved for Norberg / VHS / case-of-the-week teaching surfaces. Until approval lands the lib/cuvet-internal.ts case array is empty — the type system and badge are wired so adding a case is a 1-PR append.",
+    surfaces: ["Cases (future)", "Atlas (future)", "Norberg ground truth (future)"],
+    last_verified: "2026-05-26",
+    redistribution_note:
+      "Patient data is NEVER mirrored to git or to public storage. Anonymized derivatives land under /public/cases/cuvet-internal/<slug>/ on a per-case basis after written or verbal Aj. sign-off.",
+  },
 ];
 
 /** Helper for /sources page rendering — split by tier in the order they should display. */
-export function sourcesByTier(): { ship: DataSource[]; external: DataSource[] } {
+export function sourcesByTier(): {
+  ship: DataSource[];
+  external: DataSource[];
+  pending: DataSource[];
+} {
   return {
     ship: SOURCES.filter((s) => s.tier === "ship"),
     external: SOURCES.filter((s) => s.tier === "external"),
+    pending: SOURCES.filter((s) => s.tier === "pending"),
   };
 }
 

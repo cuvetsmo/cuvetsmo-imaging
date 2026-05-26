@@ -48,6 +48,16 @@ next-env.d.ts
 
 # local audit-log scratch from agent work — never commit
 _tmp/
+scratch/
+# Patient assets — CUVET-internal teaching cases MUST land under a
+# cuvet-internal/ subdir (anywhere in the tree). This pattern keeps
+# the existing CC BY 4.0 .dcm in /public/cases untouched while
+# blocking everything sourced from the hospital dump.
+**/cuvet-internal/
+# Raw Synapse exports — anything containing "Synapse" in the filename
+# at top level. The CC BY 4.0 cases never have this token.
+Synapse*.zip
+SynapseExport*
 
 # Phase 8 — test artifacts
 /playwright-report/

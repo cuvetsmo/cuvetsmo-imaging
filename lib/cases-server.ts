@@ -12,6 +12,7 @@
 // ============================================================================
 
 import { CASES, type ImagingCase, type Modality } from "./cases";
+import { visibleCuvetCases } from "./cuvet-internal";
 import { getSupabase } from "./supabase";
 import type { ImagingRecallPayload } from "@/types/database";
 
@@ -51,8 +52,14 @@ type CaseRow = {
  * wired yet.
  */
 export async function loadCases(): Promise<ImagingCase[]> {
+  // Cuvet-internal approved cases are merged on top of whichever source
+  // delivers the public catalog (Supabase or static). The visible-only
+  // filter (visibleCuvetCases) means cases in "pending-approval" or "hold"
+  // never reach the client bundle.
+  const cuvet = visibleCuvetCases();
+
   const sb = getSupabase();
-  if (!sb) return CASES;
+  if (!sb) return [...CASES, ...cuvet];
 
   const { data, error } = await sb
     .from("imaging_cases")
@@ -65,10 +72,10 @@ export async function loadCases(): Promise<ImagingCase[]> {
       "[cuvetsmo-imaging] Supabase case load failed, using static fallback.",
       error,
     );
-    return CASES;
+    return [...CASES, ...cuvet];
   }
 
-  return (data as unknown as CaseRow[]).map(toImagingCase);
+  return [...(data as unknown as CaseRow[]).map(toImagingCase), ...cuvet];
 }
 
 /**
@@ -76,6 +83,12 @@ export async function loadCases(): Promise<ImagingCase[]> {
  * Falls back to the static CASES array when Supabase isn't configured.
  */
 export async function loadCaseBySlug(slug: string): Promise<ImagingCase | null> {
+  // Slug may belong to a cuvet-internal case — check that pool first so
+  // an Aj.-approved teaching case wins even if a same-slug row also exists
+  // upstream. visibleCuvetCases() filters by approval_state === "approved".
+  const cuvetHit = visibleCuvetCases().find((c) => c.slug === slug);
+  if (cuvetHit) return cuvetHit;
+
   const sb = getSupabase();
   if (!sb) return CASES.find((c) => c.slug === slug) ?? null;
 

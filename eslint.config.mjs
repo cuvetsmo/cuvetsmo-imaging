@@ -18,6 +18,11 @@ const eslintConfig = defineConfig([
     "coverage/**",
     "playwright-report/**",
     "test-results/**",
+    // Phase 11 — local-only triage scripts that walk the CUVET hospital
+    // dump. Live under scratch/ (gitignored) so they never reach the
+    // production lint surface. Re-exclude here so they don't show up in
+    // `npm run lint` output either.
+    "scratch/**",
   ]),
 ]);
 

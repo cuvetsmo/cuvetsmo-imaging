@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 // and lives in the top section; "external" carries a violet badge and
 // sits below.
 export default function SourcesPage() {
-  const { ship, external } = sourcesByTier();
+  const { ship, external, pending } = sourcesByTier();
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 py-10 text-[var(--color-text)]">
@@ -86,6 +86,31 @@ export default function SourcesPage() {
         </ul>
       </section>
 
+      {/* Tier 3 — pending approval (transparency about future cuvet cases) */}
+      {pending.length > 0 && (
+        <section aria-labelledby="pending-heading" className="mb-12">
+          <div className="flex items-baseline justify-between mb-4">
+            <h2 id="pending-heading" className="text-lg font-semibold">
+              <span className="text-[var(--color-active-red)]">○</span>{" "}
+              รอ approval (โชว์เพื่อโปร่งใส)
+            </h2>
+            <span className="text-xs text-[var(--color-text-faint)]">
+              ยังไม่ ship · ห้ามอู้ว่า ship แล้ว
+            </span>
+          </div>
+          <p className="text-sm text-[var(--color-text-muted)] mb-5 leading-relaxed">
+            แหล่งด้านล่างนี้ถูก scaffold ใน codebase แล้ว แต่ยังไม่มีเคสจริง
+            ลง production จนกว่า PII scrub + per-case approval จะครบ.
+            แสดงในหน้านี้เพื่อ disclose roadmap ตรงไปตรงมา.
+          </p>
+          <ul className="space-y-4">
+            {pending.map((src) => (
+              <SourceCard key={src.id} src={src} />
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* Footer note — license literacy crib */}
       <aside className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] px-5 py-4 text-sm text-[var(--color-text-muted)] leading-relaxed">
         <p className="text-[var(--color-text)] font-medium mb-2">
@@ -122,10 +147,13 @@ export default function SourcesPage() {
 // by the parent's section so the same card renders in both contexts
 // without prop-drilling colors.
 function SourceCard({ src }: { src: DataSource }) {
-  const isShip = src.tier === "ship";
-  const badgeColor = isShip
-    ? "text-[var(--color-finalized)] border-[var(--color-finalized)]/40 bg-[var(--color-finalized)]/[0.08]"
-    : "text-[var(--color-tool-violet)] border-[var(--color-tool-violet)]/40 bg-[var(--color-tool-violet)]/[0.08]";
+  // Tier → badge color (green ship · violet external · red pending).
+  const badgeColor =
+    src.tier === "ship"
+      ? "text-[var(--color-finalized)] border-[var(--color-finalized)]/40 bg-[var(--color-finalized)]/[0.08]"
+      : src.tier === "pending"
+        ? "text-[var(--color-active-red)] border-[var(--color-active-red)]/40 bg-[var(--color-active-red)]/[0.08]"
+        : "text-[var(--color-tool-violet)] border-[var(--color-tool-violet)]/40 bg-[var(--color-tool-violet)]/[0.08]";
 
   return (
     <li
@@ -168,29 +196,31 @@ function SourceCard({ src }: { src: DataSource }) {
       )}
 
       <div className="flex flex-wrap items-center gap-3 text-xs">
-        <a
-          href={src.url}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="inline-flex items-center gap-1 text-[var(--color-tool-cyan)] hover:text-[#7DDCEF] hover:underline underline-offset-2"
-        >
-          เปิดต้นทาง
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="11"
-            height="11"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
+        {src.tier !== "pending" && (
+          <a
+            href={src.url}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="inline-flex items-center gap-1 text-[var(--color-tool-cyan)] hover:text-[#7DDCEF] hover:underline underline-offset-2"
           >
-            <path d="M7 17 17 7" />
-            <path d="M7 7h10v10" />
-          </svg>
-        </a>
+            เปิดต้นทาง
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M7 17 17 7" />
+              <path d="M7 7h10v10" />
+            </svg>
+          </a>
+        )}
         {src.doi && (
           <span className="text-[var(--color-text-faint)]">
             DOI:{" "}
