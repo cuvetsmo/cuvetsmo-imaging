@@ -85,6 +85,8 @@ const ATTR_VETXRAY =
   "VetXRay — 9,882 manually annotated canine and feline thoracic radiographs · Zenodo · DOI:10.5281/zenodo.19051776 · CC BY 4.0";
 const ATTR_MENDELEY =
   "Flores Duenas C.A., Gaxiola Camacho S.M., Montaño Gómez M.F. (2020). Radiographic Dataset for VHS determination learning process, Mendeley Data, V1, doi:10.17632/ktx4cj55pn.1 · Universidad Autónoma de Baja California";
+const ATTR_CUVET_INTERNAL =
+  "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission";
 
 export const CASES: ImagingCase[] = [
   // ────────────────────────────────────────────────────────
@@ -805,6 +807,58 @@ export const CASES: ImagingCase[] = [
         "Lobar consolidation favors bacterial; diffuse favors edema or hemorrhage",
       ],
       citation: ATTR_VETXRAY,
+    },
+  },
+
+  // ────────────────────────────────────────────────────────
+  // CUVET internal teaching cases (Aj. Ekkapol approved)
+  // Anonymized via the 4-pass scrubber + PNG→DICOM wrapper.
+  // ────────────────────────────────────────────────────────
+  {
+    id: "cuvet-pelvis-vd-001-uuid-2026-05-26",
+    slug: "cuvet-canine-pelvis-vd-001",
+    title: "Canine extended-leg pelvis VD · Norberg practice (CUVET)",
+    species: "canine",
+    signalment: "Dog · breed unknown · CUVET teaching set",
+    history:
+      "Extended-leg ventrodorsal pelvis from the CUVET teaching archive — the standard projection for coxofemoral evaluation and Norberg-angle practice. Image anonymized via the CUVET 4-pass scrubber pipeline; institutional R anatomy marker preserved.",
+    body_part: "pelvis",
+    modality: "DX",
+    difficulty: "intro",
+    learning_objectives: [
+      "ฝึก 📐 Norberg angle 4-click workflow บนภาพจริงจาก CUVET PACS",
+      "ระบุ landmark: femoral head + acetabular rim + obturator foramen",
+      "ลอง 🪄 Auto preset ดู bone contrast แล้ว drag W/L เอง",
+      "เปรียบเทียบ extended-leg position vs alternative views (ไม่มีในชุดนี้)",
+      "อ่าน R anatomy marker เพื่อยืนยัน left vs right hip",
+    ],
+    credibility: "cuvet-internal",
+    license: "Educational use, CUVET-internal · anonymized with Aj. approval",
+    source_url: "https://imaging.cuvetsmo.com/sources#cuvet-internal-teaching",
+    attribution: ATTR_CUVET_INTERNAL,
+    files: [{ view_name: "VD", path: "cuvet-canine-pelvis-vd-001/VD.dcm" }],
+    recall: {
+      // Iron Rule 0: no published radiologist read for this anonymized
+      // case, so the findings list reflects ONLY what was visually
+      // verified during the QA audit — not an inferred diagnosis.
+      findings: [
+        "Symmetric femoral-head placement in acetabula on visual inspection",
+        "Obturator foramina paired and symmetric",
+        "Sacroiliac joints visible",
+        "R anatomy marker confirms right-side orientation",
+      ],
+      ddx: [],
+      final_diagnosis:
+        "Visually normal extended-leg pelvis (no formal radiologist read available for this anonymized teaching case — practice the measurement workflow, not the diagnosis)",
+      teaching_points: [
+        "Norberg angle measures coxofemoral subluxation severity — vertex at the femoral head, lines to centre + craniolateral acetabular rim",
+        "Reference cut-offs: ≥105° normal · 95–105° borderline · <95° dysplastic (Smith et al 1990 PennHIP-adjacent)",
+        "Always measure BOTH hips and compare — asymmetry is a clinical flag even when individual angles look OK",
+      ],
+      citation: ATTR_CUVET_INTERNAL,
+      // ground_truth deliberately OMITTED. Cannot fabricate a Norberg
+      // angle without a published expert read. The overlay degrades
+      // to live-measurement-only when ground_truth is absent.
     },
   },
 ];
