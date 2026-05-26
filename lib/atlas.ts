@@ -6,13 +6,19 @@
 // of what's visible — no diagnosis, no pathology, no clinical
 // interpretation, just landmarks.
 //
-// Day 1 ships with 10 AI-generated entries via Pollinations.ai Flux
-// (per reference_pollinations-ai-image-gen.md). All entries marked
-// `credibility: "ai-generated"` so students KNOW they are looking at
-// a synthetic radiograph, not a real diagnostic image. Upgrade path:
-// replace one by one with real CC-BY radiographs from Mendeley /
-// Wikimedia / open vet atlases. See README at /atlas/README-source.md
-// for the swap procedure.
+// 100% REAL POLICY (Palm directive 2026-05-26)
+// ────────────────────────────────────────────
+// Every entry MUST be a real radiograph from a credible source:
+//   - peer-reviewed open dataset (CC BY 4.0) — VetXRay (Zenodo)
+//   - open community archive (CC BY / CC BY-SA) — Wikimedia Commons
+//   - anonymized CUVET teaching case (Aj.-approved, PII-scrubbed)
+//
+// AI-generated tiles are NOT permitted. The "ai-generated" string is
+// not part of the Credibility union — TypeScript will refuse compile
+// if anyone tries to add one. Body-part gaps (no stifle / elbow /
+// cspine / canine-abdomen as of 2026-05-26) are disclosed in the
+// honest footnote at /atlas instead of being filled with synthetic
+// images.
 
 export type Modality = "DX" | "CR" | "CT" | "MR" | "US" | "RG";
 
@@ -33,7 +39,6 @@ export type Credibility =
   | "peer-reviewed"
   | "open-textbook"
   | "community"
-  | "ai-generated"
   | "cuvet-internal";
 
 export type AtlasEntry = {
@@ -84,17 +89,6 @@ export const BODY_PART_LABELS: Record<BodyPart, string> = {
   dental: "Dental",
   other: "Other",
 };
-
-// Pollinations.ai Flux — confirmed accessible without API key per
-// reference_pollinations-ai-image-gen.md. License terms: outputs are
-// "free to use" per their FAQ but they don't claim a specific license.
-// We mark `cc-by-4.0` as a best-faith attribution license (close to
-// open creative-commons norms for AI outputs) while flagging
-// credibility:"ai-generated" so students do NOT mistake these for
-// real diagnostic radiographs. See `_atlas_seed.ps1` for the prompts
-// and seeds used.
-const POLLINATIONS_LICENSE = "cc-by-4.0";
-const POLLINATIONS_ATTR = "Generated via Pollinations.ai Flux model";
 
 // Phase 2 real-image swap — verbatim attribution strings derived from
 // the source `imageinfo.extmetadata.LicenseShortName` field on each
@@ -158,28 +152,6 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
     credibility: "community",
   },
   {
-    id: "atlas-003",
-    slug: "canine-abdomen-lat-001",
-    modality: "DX",
-    species: "canine",
-    body_part: "abdomen",
-    view: "lateral",
-    description:
-      "Canine abdominal radiograph in right-lateral recumbency. Gas in stomach and large bowel highlights serosal surfaces; liver silhouette sits behind the costal arch.",
-    learning_landmarks: [
-      "Liver silhouette",
-      "Gastric gas",
-      "Small intestinal loops",
-      "Colon / fecal material",
-      "Urinary bladder",
-      "Renal shadows (variable)",
-    ],
-    image_path: "/atlas/canine-abdomen-lat-001.jpg",
-    license: POLLINATIONS_LICENSE,
-    attribution: POLLINATIONS_ATTR,
-    credibility: "ai-generated",
-  },
-  {
     id: "atlas-004",
     slug: "canine-pelvis-vd-001",
     modality: "DX",
@@ -200,27 +172,6 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
     source_url: "https://commons.wikimedia.org/wiki/File:Normal_canine_hips.JPG",
     attribution: "Joel Mills (2007). Normal canine hips. Wikimedia Commons. CC BY-SA 3.0.",
     credibility: "community",
-  },
-  {
-    id: "atlas-005",
-    slug: "canine-skull-lat-001",
-    modality: "DX",
-    species: "canine",
-    body_part: "skull",
-    view: "lateral",
-    description:
-      "Canine skull lateral radiograph. Cranial vault, facial bones, mandible and dental arcades are profiled; tympanic bullae overlap and require oblique views to separate.",
-    learning_landmarks: [
-      "Calvarium / cranial vault",
-      "Frontal sinus",
-      "Maxilla and mandible",
-      "Dental arcades",
-      "Tympanic bullae (superimposed)",
-    ],
-    image_path: "/atlas/canine-skull-lat-001.jpg",
-    license: POLLINATIONS_LICENSE,
-    attribution: POLLINATIONS_ATTR,
-    credibility: "ai-generated",
   },
   {
     id: "atlas-006",
@@ -267,71 +218,6 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
     attribution: "Anja (2025). Radio abdominale, latéro-latérale droite, chat normal. Wikimedia Commons. CC BY-SA 4.0.",
     credibility: "community",
   },
-  {
-    id: "atlas-008",
-    slug: "canine-stifle-lat-001",
-    modality: "DX",
-    species: "canine",
-    body_part: "limb-hind",
-    view: "lateral",
-    description:
-      "Canine stifle (knee) lateral radiograph. Femorotibial joint space, patella in the trochlear groove, and the popliteal sesamoid are visible in this orientation.",
-    learning_landmarks: [
-      "Femoral condyles",
-      "Tibial plateau",
-      "Patella in trochlear groove",
-      "Fabellae (medial / lateral)",
-      "Popliteal sesamoid",
-      "Tibial tuberosity",
-    ],
-    image_path: "/atlas/canine-stifle-lat-001.jpg",
-    license: POLLINATIONS_LICENSE,
-    attribution: POLLINATIONS_ATTR,
-    credibility: "ai-generated",
-  },
-  {
-    id: "atlas-009",
-    slug: "canine-elbow-lat-001",
-    modality: "DX",
-    species: "canine",
-    body_part: "limb-fore",
-    view: "lateral",
-    description:
-      "Canine elbow lateral radiograph. Humeroulnar joint and the anconeal process are profiled; the medial coronoid is partially obscured and typically requires an additional flexed or oblique view.",
-    learning_landmarks: [
-      "Humeral condyle",
-      "Anconeal process",
-      "Olecranon (ulna)",
-      "Radial head",
-      "Humeroulnar joint space",
-    ],
-    image_path: "/atlas/canine-elbow-lat-001.jpg",
-    license: POLLINATIONS_LICENSE,
-    attribution: POLLINATIONS_ATTR,
-    credibility: "ai-generated",
-  },
-  {
-    id: "atlas-010",
-    slug: "canine-cspine-lat-001",
-    modality: "DX",
-    species: "canine",
-    body_part: "spine",
-    view: "lateral",
-    description:
-      "Canine cervical spine lateral radiograph (C1–C7). Vertebral bodies, intervertebral disc spaces and the dens of C2 are visible in profile.",
-    learning_landmarks: [
-      "C1 (atlas) wings",
-      "C2 (axis) with dens",
-      "C3–C7 vertebral bodies",
-      "Intervertebral disc spaces",
-      "Spinal canal outline",
-    ],
-    image_path: "/atlas/canine-cspine-lat-001.jpg",
-    license: POLLINATIONS_LICENSE,
-    attribution: POLLINATIONS_ATTR,
-    credibility: "ai-generated",
-  },
-
   // ────────────────────────────────────────────────────────────────
   // CUVET teaching cases — Batch 01 (5 entries · added 2026-05-26)
   //

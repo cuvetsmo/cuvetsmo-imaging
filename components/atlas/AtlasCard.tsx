@@ -81,7 +81,7 @@ export function AtlasCard({ entry }: { entry: AtlasEntry }) {
 //  - cyan (#5ACCE6) = peer-reviewed (most rigorous · Zenodo dataset)
 //  - green (#34D399, --color-finalized) = community + open-textbook +
 //    cuvet-internal (verified but less formal)
-//  - violet (#A78BFA) = ai-generated (illustrative, NOT diagnostic)
+// Atlas is 100% real (Palm directive 2026-05-26) — no AI badge.
 // Keeping inline color refs (vs CSS classes) lets us drive both the
 // foreground and border off the same token in one place; if you change
 // a token in globals.css this still tracks because the values mirror it.
@@ -122,13 +122,6 @@ function getCredBadge(c: Credibility): CredBadge | null {
         color: "#34D399", // --color-finalized
         borderColor: "rgba(52,211,153,0.55)",
         ariaLabel: "CUVET internal reference radiograph",
-      };
-    case "ai-generated":
-      return {
-        label: "🤖 AI-gen",
-        color: "#A78BFA", // --color-tool-violet
-        borderColor: "rgba(167,139,250,0.55)",
-        ariaLabel: "AI-generated illustrative placeholder, not a real diagnostic radiograph",
       };
     default:
       return null;

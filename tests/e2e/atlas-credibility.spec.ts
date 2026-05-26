@@ -1,124 +1,76 @@
-// atlas-credibility.spec.ts — deeper Atlas coverage than atlas.spec.ts.
+// atlas-credibility.spec.ts — Phase 13 (Palm directive 2026-05-26).
 //
-// Phase 7 added a credibility split pill at the top of /atlas with two
-// clickable segments: "<N> real" and "<M> AI-illustrative". Counts are
-// derived from lib/atlas.ts entries (Iron Rule 0 — never hardcoded).
-// Today the catalog ships 5 real (peer-reviewed/community) + 5 AI-
-// illustrative entries, matching the spec's expected pill text.
+// Atlas is 100% real radiographs. AI tiles + AI-illustrative segment
+// + 🤖 AI-gen badge are all retired. This spec enforces the new
+// invariant: every visible card carries a verified-credibility badge,
+// and the page contains zero AI-leakage.
 //
-// What atlas.spec.ts already covers:
-//   - Grid renders
-//   - Pill has both segments
-//   - Clicking "real" narrows count
-//
-// What THIS spec adds:
-//   - Pill text contains the actual data-derived counts (not hardcoded
-//     literals that could drift if entries are added)
-//   - After clicking "real", every visible card has a peer-reviewed
-//     OR community OR open-textbook OR cuvet-internal badge (NOT
-//     ai-gen). Badge labels are owned by AtlasCard.tsx:
-//       "✓ Peer-reviewed" / "✓ Community" / "✓ Textbook" / "✓ CUVET"
-//   - After clicking "AI-illustrative", every visible card carries
-//     the "🤖 AI-gen" badge
+// What this spec covers:
+//   - Provenance breakdown shows in the header (status role)
+//   - Every card visible on /atlas has one of the four verified labels
+//   - No "🤖 AI-gen" badge appears anywhere
+//   - No "AI-illustrative" copy / segment / button appears anywhere
+//   - Removed slugs (canine-abdomen-lat-001 etc.) return 404 — protects
+//     against a stale entry sneaking back in.
 
 import { test, expect } from '@playwright/test';
 
-test.describe('Atlas Phase 7 credibility split', () => {
-  test('pill counts are data-derived · 5 real · 5 AI-illustrative', async ({
+test.describe('Atlas Phase 13 — 100% real invariant', () => {
+  test('provenance breakdown is data-derived + visible', async ({ page }) => {
+    await page.goto('/atlas');
+
+    const provenance = page.getByRole('status', { name: /atlas provenance/i });
+    await expect(provenance).toBeVisible();
+
+    // Total count text — "N real radiographs" — must contain a positive
+    // integer pulled from data, not a hardcoded literal.
+    const text = await provenance.textContent();
+    const match = text?.match(/(\d+)\s+real radiographs/i);
+    expect(match, 'provenance must show a real-radiograph count').toBeTruthy();
+    const total = Number(match?.[1] ?? -1);
+    expect(total).toBeGreaterThan(0);
+  });
+
+  test('every visible card has a verified badge — zero AI residue', async ({
     page,
   }) => {
     await page.goto('/atlas');
 
-    // The two segments are <button>s with aria-label that EMBEDS the
-    // count (e.g. "Show 5 real reference radiographs only"). Asserting
-    // on the aria-label proves the count is wired through, not just
-    // displayed as a static "5".
-    const realSegment = page.getByRole('button', {
-      name: /Show \d+ real reference radiographs only/i,
-    });
-    const aiSegment = page.getByRole('button', {
-      name: /Show \d+ AI-illustrative entries only/i,
-    });
-
-    await expect(realSegment).toBeVisible();
-    await expect(aiSegment).toBeVisible();
-
-    // Pull the counts back out for cross-checking against the visible
-    // card count after each filter is applied. Regex match the aria-
-    // label literally — owner of the text is AtlasGrid.tsx line 262.
-    const realLabel = await realSegment.getAttribute('aria-label');
-    const aiLabel = await aiSegment.getAttribute('aria-label');
-
-    const realCount = Number(realLabel?.match(/Show (\d+) real/)?.[1] ?? -1);
-    const aiCount = Number(
-      aiLabel?.match(/Show (\d+) AI-illustrative/)?.[1] ?? -1,
-    );
-
-    expect(realCount, 'real count should be a positive integer').toBeGreaterThan(0);
-    expect(aiCount, 'AI count should be a positive integer').toBeGreaterThan(0);
-
-    // Footer paragraph echoes the same numbers in human copy — keeps
-    // the header pill + footer in lockstep (both derive from the same
-    // `realCount`/`aiCount` memos in AtlasGrid.tsx).
-    const footer = page.getByText(/Atlas tiles are a mix/i);
-    await expect(footer).toBeVisible();
-  });
-
-  test('clicking real-segment shows only verified badges', async ({ page }) => {
-    await page.goto('/atlas');
-
-    const realSegment = page.getByRole('button', {
-      name: /Show \d+ real reference radiographs only/i,
-    });
-    await realSegment.click();
-
-    // After clicking, every remaining card MUST show one of the four
-    // "real" badge labels and MUST NOT show "🤖 AI-gen". We test by
-    // counting the AI-gen badges visible in the cards area — should
-    // be zero.
     const cards = page.locator('a[href^="/atlas/"]');
-    // Give the filter a beat to settle.
-    await expect.poll(async () => await cards.count(), {
-      timeout: 5_000,
-    }).toBeGreaterThan(0);
+    await expect(cards.first()).toBeVisible();
 
-    // AI-gen badges should not appear in any visible card.
-    const aiGenBadges = page.locator('a[href^="/atlas/"] >> text=/🤖 AI-gen/');
-    expect(await aiGenBadges.count()).toBe(0);
-
-    // At least one verified-badge token must appear on the page (any
-    // of the four real-credibility labels).
-    const verifiedBadge = page
+    // Each card must contain at least one of the four verified labels.
+    const verifiedCount = await page
       .locator('a[href^="/atlas/"]')
       .getByText(/✓ Peer-reviewed|✓ Community|✓ Textbook|✓ CUVET/)
-      .first();
-    await expect(verifiedBadge).toBeVisible();
+      .count();
+    const cardCount = await cards.count();
+    expect(
+      verifiedCount,
+      `every card (${cardCount}) must show a verified badge`,
+    ).toBeGreaterThanOrEqual(cardCount);
+
+    // ZERO tolerance for AI residue across the page.
+    expect(await page.locator('text=/🤖 AI-gen/').count()).toBe(0);
+    expect(await page.locator('text=/AI-illustrative/').count()).toBe(0);
+    expect(
+      await page.getByRole('button', { name: /AI-illustrative/i }).count(),
+    ).toBe(0);
   });
 
-  test('clicking AI-segment shows only AI-gen badges', async ({ page }) => {
-    await page.goto('/atlas');
-
-    const aiSegment = page.getByRole('button', {
-      name: /Show \d+ AI-illustrative entries only/i,
-    });
-    await aiSegment.click();
-
-    const cards = page.locator('a[href^="/atlas/"]');
-    await expect.poll(async () => await cards.count(), {
-      timeout: 5_000,
-    }).toBeGreaterThan(0);
-
-    // No verified-credibility badges should appear under the AI filter.
-    const verifiedBadges = page
-      .locator('a[href^="/atlas/"]')
-      .getByText(/✓ Peer-reviewed|✓ Community|✓ Textbook|✓ CUVET/);
-    expect(await verifiedBadges.count()).toBe(0);
-
-    // At least one "🤖 AI-gen" badge should appear.
-    const aiGenBadge = page
-      .locator('a[href^="/atlas/"]')
-      .getByText(/🤖 AI-gen/)
-      .first();
-    await expect(aiGenBadge).toBeVisible();
+  test('removed AI slugs no longer resolve', async ({ page }) => {
+    // The 5 retired Pollinations entries — if any sneaks back into
+    // lib/atlas.ts these become 200s instead of 404s.
+    const ghostSlugs = [
+      'canine-abdomen-lat-001',
+      'canine-skull-lat-001',
+      'canine-stifle-lat-001',
+      'canine-elbow-lat-001',
+      'canine-cspine-lat-001',
+    ];
+    for (const slug of ghostSlugs) {
+      const resp = await page.goto(`/atlas/${slug}`);
+      expect(resp?.status(), `${slug} should be 404`).toBe(404);
+    }
   });
 });

@@ -1,35 +1,35 @@
 // atlas.spec.ts — smoke test for /atlas (Anatomy Atlas).
 //
-// Confirms the 10-card grid renders + the credibility split pill
-// ("5 real · 5 AI-illustrative") shows + clicking the "real" segment
-// narrows the visible set.
+// Phase 13 (Palm directive 2026-05-26): atlas is 100% real radiographs.
+// The old real-vs-AI quick-filter pill was removed; a non-interactive
+// provenance breakdown ("N real radiographs · X peer-reviewed · Y
+// community · Z CUVET") sits in its place. This spec asserts the
+// new shape AND zero presence of AI badges anywhere on the page.
 
 import { test, expect } from '@playwright/test';
 
-test('Atlas grid renders with credibility split pill', async ({ page }) => {
+test('Atlas grid renders with 100%-real provenance breakdown', async ({ page }) => {
   await page.goto('/atlas');
 
-  // Header copy from AtlasGrid.tsx — "ดู normal ให้ครบ 100 ครั้งก่อน...".
+  // Header copy from AtlasGrid.tsx.
   await expect(page.getByText(/normal/i).first()).toBeVisible();
 
-  // The split pill contains two clickable segments; their labels are
-  // "real" and "AI-illustrative". Counts are computed from lib/atlas.ts —
-  // we don't hardcode "5" because data may grow; we DO assert the labels
-  // exist.
-  const realSegment = page.getByRole('button', { name: /real reference radiographs/i });
-  await expect(realSegment).toBeVisible();
-  const aiSegment = page.getByRole('button', { name: /AI-illustrative entries/i });
-  await expect(aiSegment).toBeVisible();
+  // Provenance breakdown — role="status" (not a button, not clickable)
+  // with aria-label "Atlas provenance". It must show a "real
+  // radiographs" label + the total count.
+  const provenance = page.getByRole('status', { name: /atlas provenance/i });
+  await expect(provenance).toBeVisible();
+  await expect(provenance).toContainText(/real radiographs/i);
 
-  // Cards link to /atlas/<slug>. Day-1 catalog is 10 entries.
+  // ZERO tolerance for AI residue — no segments, no badges, no copy.
+  const aiSegment = page.getByRole('button', { name: /AI-illustrative/i });
+  expect(await aiSegment.count()).toBe(0);
+  const aiGenBadge = page.locator('text=/🤖 AI-gen/');
+  expect(await aiGenBadge.count()).toBe(0);
+
+  // Cards link to /atlas/<slug>. Catalog should have at least 5.
   const cards = page.locator('a[href^="/atlas/"]');
-  // Wait until the grid hydrates.
   await expect(cards.first()).toBeVisible();
-  const initial = await cards.count();
-  expect(initial).toBeGreaterThanOrEqual(5);
-
-  // Click "real" to narrow. After clicking, visible card count should
-  // be ≤ initial (cannot be more — that would be a counting bug).
-  await realSegment.click();
-  await expect.poll(async () => await cards.count()).toBeLessThanOrEqual(initial);
+  const count = await cards.count();
+  expect(count).toBeGreaterThanOrEqual(5);
 });
