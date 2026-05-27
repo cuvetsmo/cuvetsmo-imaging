@@ -6,7 +6,16 @@ import {
   MODALITY_LABELS,
   SPECIES_LABELS,
 } from "@/lib/atlas";
+import { CASES } from "@/lib/cases";
 import { AtlasCard } from "./AtlasCard";
+
+// Cross-link helper — if an atlas slug also exists as a case slug
+// (true for every CUVET-internal entry by construction), return the
+// matching ImagingCase so AtlasDetail can offer "open in DICOM viewer".
+// Static lookup against CASES — no fetch, no network, no client work.
+function matchingCase(slug: string) {
+  return CASES.find((c) => c.slug === slug);
+}
 
 /**
  * AtlasDetail — single atlas-entry detail view.
@@ -188,12 +197,54 @@ export function AtlasDetail({
         </div>
       </section>
 
-      {/* Related cases — only renders the cross-link tile; the cases page
-          itself will surface whatever exists. Agent B owns lib/cases.ts. */}
+      {/* Related cases — direct link to the matching DICOM case when the
+          atlas slug doubles as a case slug (CUVET-internal entries),
+          plus a body-part-filtered fallback to /cases. */}
       <section className="mb-8">
         <h2 className="text-[13px] font-mono uppercase tracking-[0.18em] text-[var(--color-text)] mb-3 flex items-center gap-2">
           <span className="text-[var(--color-tool-violet)]">04 /</span> Next — apply to a case
         </h2>
+        {(() => {
+          const matched = matchingCase(entry.slug);
+          if (matched) {
+            return (
+              <Link
+                href={`/cases/${matched.slug}`}
+                className="imaging-tool-tile group mb-3"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <span className="font-semibold text-[var(--color-text)] tracking-tight text-[15px]">
+                      Open in DICOM viewer — {matched.title}
+                    </span>
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--color-finalized)]">
+                      paired case
+                    </span>
+                  </div>
+                  <div className="text-[13px] text-[var(--color-text-muted)] leading-relaxed">
+                    Same anonymized radiograph wrapped as DICOM —
+                    practice Norberg / VHS / Length measurements live on this image.
+                  </div>
+                </div>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.75"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="imaging-tile-arrow"
+                  aria-hidden="true"
+                >
+                  <path d="M5 12h14M13 5l7 7-7 7" />
+                </svg>
+              </Link>
+            );
+          }
+          return null;
+        })()}
         <Link
           href={`/cases?body=${encodeURIComponent(entry.body_part)}`}
           className="imaging-tool-tile group"

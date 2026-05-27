@@ -2,13 +2,16 @@
 //
 // What we verify:
 //   1. Page loads + document title contains "Imaging"
-//   2. All 5 site-header nav links present (Cases, Review, Atlas, Occlusion, About)
+//   2. Primary nav links present (Phase 22: 5 always-visible · 7 total
+//      including 2 that hide below sm breakpoint to save mobile space).
+//      Always-on:  Cases, Atlas, Quiz, Review, Progress
+//      Desktop:    Occlusion, About (hidden on phones to fit 375px)
 //   3. No `console.error` during initial render
 //   4. Mobile viewport: nav still present (no horizontal scroll bug)
 
 import { test, expect, type ConsoleMessage } from '@playwright/test';
 
-test('home page loads with title and 5 nav links', async ({ page }) => {
+test('home page loads with title + primary nav links', async ({ page }) => {
   const errors: string[] = [];
   page.on('console', (msg: ConsoleMessage) => {
     if (msg.type() === 'error') errors.push(msg.text());
@@ -18,8 +21,9 @@ test('home page loads with title and 5 nav links', async ({ page }) => {
   // App title contains "Imaging" — set in app/layout.tsx metadata.
   await expect(page).toHaveTitle(/Imaging/);
 
-  // All 5 site-header nav links (from components/Brand.tsx).
-  for (const label of ['Cases', 'Review', 'Atlas', 'Occlusion', 'About']) {
+  // The 5 always-visible nav items (post Phase 22). Occlusion + About
+  // are hidden on phones to fit; they show on sm+.
+  for (const label of ['Cases', 'Atlas', 'Quiz', 'Review', 'Progress']) {
     await expect(
       page.getByRole('navigation').getByRole('link', { name: label }),
     ).toBeVisible();

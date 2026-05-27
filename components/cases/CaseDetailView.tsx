@@ -11,12 +11,20 @@ import {
 } from 'react';
 import Link from 'next/link';
 import type { ImagingCase } from '@/lib/cases';
+import { ATLAS_ENTRIES } from '@/lib/atlas';
 import { RecallInputCard } from './RecallInputCard';
 import { RevealedCard } from './RevealedCard';
 import { DDxRankerCard } from './DDxRankerCard';
 import { LesionSpotCard } from './LesionSpotCard';
 import { RelatedCases } from './RelatedCases';
 import type { Box } from '@/lib/scoring/iou';
+
+// Atlas pairing — when the case slug matches an atlas slug (CUVET
+// entries are 1:1), surface the static-reference link so the student
+// can compare against the labeled landmarks.
+function matchingAtlasEntry(slug: string) {
+  return ATLAS_ENTRIES.find((a) => a.slug === slug);
+}
 
 const DicomViewport = lazy(() => import('@/components/lab/DicomViewport.jsx'));
 
@@ -560,6 +568,34 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
           )}
         </footer>
       )}
+
+      {caseMeta && (() => {
+        const atlas = matchingAtlasEntry(caseMeta.slug);
+        if (!atlas) return null;
+        return (
+          <section className="mt-6 pt-5 border-t border-[var(--color-border)]">
+            <Link
+              href={`/atlas/${atlas.slug}`}
+              className="block rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] hover:border-[var(--color-tool-cyan)]/40 hover:bg-[var(--color-surface-lift)] transition-colors px-4 py-3"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--color-tool-violet)] mb-0.5">
+                    Static reference
+                  </div>
+                  <div className="text-[14px] font-semibold text-[var(--color-text)] truncate">
+                    Open atlas page — labeled landmarks for this view
+                  </div>
+                  <div className="text-[12px] text-[var(--color-text-muted)] truncate">
+                    Same anonymized radiograph · 5–7 anatomical landmarks listed · provenance + license panel
+                  </div>
+                </div>
+                <span className="text-[var(--color-tool-cyan)] text-lg shrink-0">→</span>
+              </div>
+            </Link>
+          </section>
+        );
+      })()}
 
       {caseMeta && catalog.length > 0 && (
         <RelatedCases

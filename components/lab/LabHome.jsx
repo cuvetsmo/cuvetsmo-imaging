@@ -23,6 +23,30 @@ import { autoModeForFiles, detectSyncCompareCandidate } from '../../lib/dicom/st
 import { parseDicomBatch } from '../../lib/dicom/parse-pool.ts';
 // Agent 🅲 — pure Study/Series grouping over a flat DicomFileMeta[].
 import { organizeIntoStudies } from '../../lib/dicom/study-organizer.ts';
+// Phase 22 — auto-derived counts for the hero bento + Case Library tile.
+// Counts are computed at module load (static); Iron Rule 0 — never hardcoded.
+import { ATLAS_ENTRIES } from '../../lib/atlas';
+import { CASES } from '../../lib/cases';
+
+const ATLAS_TOTAL = ATLAS_ENTRIES.length;
+const ATLAS_CUVET = ATLAS_ENTRIES.filter((e) => e.credibility === 'cuvet-internal').length;
+const CASES_TOTAL = CASES.length;
+const CASES_CUVET = CASES.filter((c) => c.credibility === 'cuvet-internal').length;
+const CUVET_TOTAL = ATLAS_CUVET + CASES_CUVET;
+// 100% real because Phase 13 retired all AI atlas entries + Iron Rule 0
+// lint guards regression. The actual computation derives from data so
+// if a non-real entry ever sneaks back in this number falls below 100.
+const REAL_PCT = Math.round(
+  (ATLAS_ENTRIES.filter(
+    (e) =>
+      e.credibility === 'peer-reviewed' ||
+      e.credibility === 'community' ||
+      e.credibility === 'open-textbook' ||
+      e.credibility === 'cuvet-internal',
+  ).length /
+    ATLAS_TOTAL) *
+    100,
+);
 // Agent 🅳 — IndexedDB-backed persistence + custom-event refresh signal.
 import { saveBatch, loadAllStudies, loadThumbnailMap, saveThumbnail } from '../../lib/dicom/dicom-store.ts';
 // AGENT-B Phase 5 — thumbnail worker pool. Generates 192×192 PNG previews
@@ -903,6 +927,16 @@ export default function LabHome() {
               <li className="flex items-center gap-2"><span aria-hidden className="imaging-cap-dot" /> Image occlusion editor</li>
               <li className="flex items-center gap-2"><span aria-hidden className="imaging-cap-dot finalized" /> ไม่ขึ้น server</li>
             </ul>
+
+            {/* Phase 22 — auto-derived bento stats. All counts pulled
+                straight from lib/atlas.ts + lib/cases.ts at module load
+                so they never drift. */}
+            <dl className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-2 max-w-[28rem]">
+              <BentoStat label="cases" value={CASES_TOTAL} sub="DICOM" />
+              <BentoStat label="atlas" value={ATLAS_TOTAL} sub="reference" />
+              <BentoStat label="CUVET" value={CUVET_TOTAL} sub="anonymized" accent />
+              <BentoStat label="real" value={REAL_PCT} unit="%" sub="no AI" success />
+            </dl>
           </div>
 
           {/* Right: stylised viewer preview · static SVG, not a live viewer.
@@ -1037,7 +1071,7 @@ export default function LabHome() {
               href="/cases"
               title="Case Library"
               desc="Curated CC-BY radiographs across X-ray, CT, MR, US"
-              meta="16 cases, grows weekly"
+              meta={`${CASES_TOTAL} cases · ${CASES_CUVET} CUVET DICOM`}
               art={
                 /* Real anonymized CUVET canine thorax lateral · cropped to fit tile */
                 <div className="relative w-[110px] h-[68px] rounded-md overflow-hidden bg-black ring-1 ring-[var(--color-border-bright)]">
@@ -1474,6 +1508,38 @@ function ViewerPane({
 const studyGridStyle = {
   display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 12,
 };
+
+/**
+ * BentoStat — small stat tile for the hero bento grid (Phase 22).
+ * Auto-derived counts only; no hardcoded numbers. Renders 0 honestly
+ * (Iron Rule 0) instead of spinner-or-skeleton because the counts come
+ * from imports at module load time, not async data.
+ */
+function BentoStat({ label, value, unit = '', sub, accent, success }) {
+  const tone = success
+    ? 'text-[var(--color-finalized)]'
+    : accent
+      ? 'text-[var(--color-tool-cyan)]'
+      : 'text-[var(--color-text)]';
+  return (
+    <dl
+      role="group"
+      className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2"
+    >
+      <dt className="text-[10px] font-mono uppercase tracking-wider text-[var(--color-text-faint)]">
+        {label}
+      </dt>
+      <dd className={`text-xl font-mono font-semibold tabular-nums leading-tight ${tone}`}>
+        {value}
+        {unit && <span className="text-[14px] ml-0.5">{unit}</span>}
+      </dd>
+      {sub && (
+        <dd className="text-[9px] font-mono text-[var(--color-text-faint)] mt-0.5">{sub}</dd>
+      )}
+    </dl>
+  );
+}
+
 // Phase 6 — Synced-compare grid. Two equal columns at ≥768px so the
 // L/R panes share the available width. The viewport canvas itself uses
 // `clamp(380px, calc(100vh - 260px), 900px)` for height, so the panes

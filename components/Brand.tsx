@@ -38,20 +38,32 @@ export function SiteHeader() {
             extra padding on phones). On 320px the 5 items pack tight
             (~270px including gaps + logo) — verified by sum of widths,
             no horizontal scroll. */}
-        <nav className="flex items-center gap-0.5 sm:gap-3 text-[13px] sm:text-sm">
+        {/* Nav restructured Phase 22 — added Quiz primary + Progress.
+            7 items on a 375px viewport packs tight but readable
+            (text-[12px] on mobile, sm:text-sm on tablet+). Critical
+            study surfaces (Cases · Atlas · Quiz · Review) stay
+            ordered by frequency-of-use; Occlusion + About + Progress
+            sit at the right as secondary. */}
+        <nav className="flex items-center gap-0 sm:gap-2 text-[12px] sm:text-[13px]">
           <Link href="/cases" className="px-1 sm:px-2 py-1.5 min-h-[44px] inline-flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
             Cases
-          </Link>
-          <Link href="/review" className="px-1 sm:px-2 py-1.5 min-h-[44px] inline-flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
-            Review
           </Link>
           <Link href="/atlas" className="px-1 sm:px-2 py-1.5 min-h-[44px] inline-flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
             Atlas
           </Link>
-          <Link href="/occlusion" className="px-1 sm:px-2 py-1.5 min-h-[44px] inline-flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
+          <Link href="/quiz" className="px-1 sm:px-2 py-1.5 min-h-[44px] inline-flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
+            Quiz
+          </Link>
+          <Link href="/review" className="px-1 sm:px-2 py-1.5 min-h-[44px] inline-flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
+            Review
+          </Link>
+          <Link href="/occlusion" className="px-1 sm:px-2 py-1.5 min-h-[44px] inline-flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors hidden sm:inline-flex">
             Occlusion
           </Link>
-          <Link href="/about" className="px-1 sm:px-2 py-1.5 min-h-[44px] inline-flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
+          <Link href="/progress" className="px-1 sm:px-2 py-1.5 min-h-[44px] inline-flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors">
+            Progress
+          </Link>
+          <Link href="/about" className="px-1 sm:px-2 py-1.5 min-h-[44px] inline-flex items-center text-[var(--color-text-muted)] hover:text-[var(--color-tool-cyan)] transition-colors hidden sm:inline-flex">
             About
           </Link>
         </nav>
