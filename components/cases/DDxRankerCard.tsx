@@ -227,7 +227,6 @@ export function DDxRankerCard({ caseMeta, expertDdx, extraExcludes, onSubmit, on
           {slots.map((name, i) => {
             const mark = result.marks[i] ?? 'wrong';
             const style = MARK_STYLES[mark];
-            const expertName = result.expertOrder[i];
             return (
               <li
                 key={i}

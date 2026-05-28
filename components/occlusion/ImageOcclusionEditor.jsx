@@ -20,8 +20,6 @@ import { genMaskId } from '../../lib/image-occlusion.js';
 
 const ACCEPT_TYPES = 'image/png,image/jpeg,image/jpg,image/webp,image/svg+xml';
 const WARN_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB → warn but allow
-const HANDLE_PX = 12; // resize-handle hit target (visual is smaller)
-const HIT_PAD = 6; // extra slop around handles for touch users
 
 // 8 resize handles + 1 body drag. Handle key encodes which edges move.
 const HANDLES = [
@@ -450,6 +448,11 @@ export default function ImageOcclusionEditor({ initialDeck, onSave, onClose }) {
               cursor: tool === 'rect' ? 'crosshair' : 'default',
             }}
           >
+            {/* next/image cannot be used here: this is a user-supplied
+                blob/data-URL base layer the occlusion-rect SVG aligns to
+                pixel-for-pixel via imgRef. next/image rewrites the URL +
+                lazy-loads + changes layout, breaking the coordinate map. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               ref={imgRef}
               src={imageDataUrl}

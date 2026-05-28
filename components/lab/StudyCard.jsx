@@ -177,7 +177,12 @@ export default function StudyCard({
           the title text below already describes the study (a11y:
           decorative). */}
       <div style={thumbWrapStyle(modalityKey)}>
+        {/* thumbUrl is a runtime blob: URL from URL.createObjectURL() on a
+            canvas-rendered DICOM thumbnail (thumbnail-worker). next/image
+            only handles static/remote URLs it can proxy; a per-session blob
+            URL is neither, so a raw <img> is required. */}
         {thumbUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={thumbUrl}
             alt=""

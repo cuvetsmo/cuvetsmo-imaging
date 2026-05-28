@@ -62,7 +62,6 @@ const TAG_WINDOW_CENTER = "x00281050";
 const TAG_WINDOW_WIDTH = "x00281051";
 const TAG_RESCALE_SLOPE = "x00281053";
 const TAG_RESCALE_INTERCEPT = "x00281052";
-const TAG_NUM_FRAMES = "x00280008";
 const TAG_PIXEL_DATA = "x7fe00010";
 
 // ─── Worker message handler ────────────────────────────────────────────
@@ -118,7 +117,8 @@ async function renderThumbnail(
     dataSet.string(TAG_PHOTOMETRIC)?.trim().toUpperCase() ?? "MONOCHROME2";
   const samplesPerPixel = dataSet.uint16(TAG_SAMPLES_PER_PIXEL) ?? 1;
   const planarConfig = dataSet.uint16(TAG_PLANAR_CONFIG) ?? 0;
-  const numFrames = parseInt(dataSet.string(TAG_NUM_FRAMES) ?? "1", 10) || 1;
+  // Thumbnails render frame 0 only; multi-frame count intentionally
+  // not read here (the full DicomViewport handles multi-frame stacks).
   const rescaleSlope =
     (dataSet.floatString(TAG_RESCALE_SLOPE) ??
       parseFloat(dataSet.string(TAG_RESCALE_SLOPE) ?? "1")) ||
@@ -136,7 +136,6 @@ async function renderThumbnail(
   const pixelsPerFrame = rows * cols * samplesPerPixel;
   const bytesPerSample = bitsAllocated <= 8 ? 1 : 2;
   const frameByteLength = pixelsPerFrame * bytesPerSample;
-  const totalBytes = frameByteLength * numFrames;
 
   // Bounds check — if the element claims more bytes than we have, clamp
   // rather than overrun. Some malformed DICOMs have wrong length tags.

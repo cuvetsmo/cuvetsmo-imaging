@@ -31,7 +31,6 @@ import type {
   ParseProgressFn,
   ParseRequest,
   ParseResponse,
-  ParsedHeader,
 } from "./parse-types";
 
 // ---------------------------------------------------------------------------

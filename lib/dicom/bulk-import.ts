@@ -242,11 +242,9 @@ export async function unpackZipFile(
 
   const out: File[] = [];
   const names = Object.keys(entries);
-  let processed = 0;
 
   for (const path of names) {
     if (opts?.signal?.aborted) break;
-    processed++;
     opts?.onProgress?.(out.length, names.length);
 
     // Skip directory entries (path ends with /) and obvious junk
