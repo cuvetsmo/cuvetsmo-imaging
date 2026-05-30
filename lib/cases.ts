@@ -235,17 +235,12 @@ export const CASES: ImagingCase[] = [
         "Cats have proportionally smaller cardiac silhouette vs dogs",
       ],
       citation: ATTR_VETXRAY,
-      // Defensible because the dataset label is `no_finding` (peer-
-      // reviewed VetXRay) and the published feline mean is 7.5 v
-      // (Litster & Buchanan 2000). Mid-range placement avoids
-      // implying false precision beyond the dataset's per-case
-      // resolution.
-      ground_truth: {
-        vhs: {
-          value: 7.5,
-          source: "Litster & Buchanan 2000 feline mean · dataset label = no_finding",
-        },
-      },
+      // ground_truth.vhs OMITTED (audit 2026-05-30): VetXRay labels this
+      // image `no_finding` but provides NO per-image VHS. A normal feline
+      // thorax is a RANGE (6.7–8.1), not a single value — scoring against
+      // a population mean would imply false precision this image can't
+      // support. Student measures live + self-checks vs the reference
+      // range in teaching_points (Iron Rule 0).
     },
   },
   {
@@ -286,16 +281,13 @@ export const CASES: ImagingCase[] = [
         '"Valentine heart" silhouette on DV/VD is the classic HCM marker',
       ],
       citation: ATTR_VETXRAY,
-      // Defensible because dataset label is `cardiomegaly` (peer-
-      // reviewed) — feline cardiomegaly literature places mild–
-      // moderate enlargement at ~8.7–9.0 v (Litster 2000 reports
-      // affected cats clustering ~1 v above the 8.1 upper limit).
-      ground_truth: {
-        vhs: {
-          value: 8.8,
-          source: "Litster 2000 cardiomegaly cluster · dataset label = cardiomegaly",
-        },
-      },
+      // ground_truth.vhs OMITTED (audit 2026-05-30): dataset label is
+      // `cardiomegaly` but provides no per-image VHS. Cardiomegaly is a
+      // threshold (>8.1 feline), not a single value — a population
+      // cluster estimate isn't this image's measured VHS. Student
+      // measures live + compares to the >8.1 threshold (Iron Rule 0).
+      // lesion_region (cardiac silhouette) KEPT — anatomically located +
+      // dataset-confirmed enlargement; spatial IoU is forgiving.
       // Defensible because cardiomegaly = enlarged cardiac silhouette
       // by definition. In a feline lateral, the heart sits roughly
       // mid-thorax, slightly cranio-ventral, occupying ~2-3 intercostal
@@ -609,15 +601,11 @@ export const CASES: ImagingCase[] = [
         "Breed conformation modifies the upper end — Labradors and barrel-chested breeds can run 10.5–11 while normal",
       ],
       citation: ATTR_VETXRAY,
-      // Defensible because dataset label is `no_finding` (peer-
-      // reviewed) and canine published mean is 9.7 v (Buchanan
-      // 1995). Anchored slightly below the mean to land mid-window.
-      ground_truth: {
-        vhs: {
-          value: 9.5,
-          source: "Buchanan & Bücheler 1995 canine mean · dataset label = no_finding",
-        },
-      },
+      // ground_truth.vhs OMITTED (audit 2026-05-30): dataset labels this
+      // `no_finding` but provides no per-image VHS. A normal canine
+      // thorax is a RANGE (8.5–10.5), not a single value — scoring vs a
+      // population mean implies false precision. Student measures live +
+      // self-checks vs the reference range in teaching_points (Iron Rule 0).
     },
   },
   {
@@ -656,17 +644,13 @@ export const CASES: ImagingCase[] = [
         "DCM more common in large breeds (Doberman, Great Dane, Boxer)",
       ],
       citation: ATTR_VETXRAY,
-      // Defensible because dataset label is `cardiomegaly` and the
-      // common clinical literature (Buchanan; Lamb & Boswood) places
-      // moderate cardiomegaly at ~11.5 v in dogs — about 1 v above
-      // the 10.5 upper limit. Without the original case's reader
-      // value, mid-cardiomegaly is the most defensible anchor.
-      ground_truth: {
-        vhs: {
-          value: 11.5,
-          source: "Lamb & Boswood 2002 moderate cardiomegaly cluster · dataset label = cardiomegaly",
-        },
-      },
+      // ground_truth.vhs OMITTED (audit 2026-05-30): dataset label is
+      // `cardiomegaly` but provides no per-image VHS. Cardiomegaly is a
+      // threshold (>10.5 canine), not a single value — a population
+      // cluster estimate isn't this image's measured VHS. Student
+      // measures live + compares to the >10.5 threshold (Iron Rule 0).
+      // lesion_region (cardiac silhouette) KEPT — anatomically located +
+      // dataset-confirmed enlargement; spatial IoU is forgiving.
       // Defensible because cardiomegaly = enlarged cardiac silhouette
       // by definition. In a canine lateral the heart occupies roughly
       // T4-T8 vertebral span (Buchanan 1995) — mid-thorax horizontally
@@ -1154,17 +1138,17 @@ export const CASES: ImagingCase[] = [
   {
     id: "cuvet-feline-skull-lat-001-uuid-2026-05-26",
     slug: "cuvet-feline-skull-lat-001",
-    title: "Feline skull lateral · brachycephalic (CUVET)",
+    title: "Feline skull lateral (CUVET)",
     species: "feline",
-    signalment: "Cat · breed unknown (brachycephalic conformation) · CUVET teaching set",
+    signalment: "Cat · breed unknown · CUVET teaching set",
     history:
-      "Lateral skull from the CUVET teaching archive. Brachycephalic conformation — shortened muzzle, prominent globe outlines, rounded cranial vault. Pair with /cases/cuvet-feline-skull-dv-001 for two-view skull evaluation.",
+      "Lateral skull from the CUVET teaching archive — rounded cranial vault and short rostrum typical of feline conformation. Pair with /cases/cuvet-feline-skull-dv-001 for two-view skull evaluation. (Cephalic conformation not asserted: breed unknown, single anonymized view.)",
     body_part: "skull",
     modality: "DX",
     difficulty: "intro",
     learning_objectives: [
-      "ระบุ brachycephalic conformation signs: shortened muzzle · rounded cranium · prominent globes",
-      "เปรียบเทียบกับ /cases/cuvet-canine-skull-lat-001 (mesocephalic canine)",
+      "ระบุ feline skull landmarks: rounded cranial vault · short rostrum · tympanic bullae · dental arcade",
+      "เปรียบเทียบกับ /cases/cuvet-canine-skull-lat-001 (longer-muzzled canine)",
       "ลอง 📏 Length tool: วัด skull length vs cranial width (cephalic index)",
       "อ่าน tympanic bullae ในมุม lateral (superimposed left + right)",
     ],
@@ -1175,17 +1159,17 @@ export const CASES: ImagingCase[] = [
     files: [{ view_name: "Lateral", path: "cuvet-feline-skull-lat-001/LAT.dcm" }],
     recall: {
       findings: [
-        "Calvarium / cranial vault (rounded brachycephalic shape)",
-        "Maxilla + mandible (shortened)",
-        "Dental arcades (compressed crown spacing)",
+        "Calvarium / cranial vault (rounded — typical feline)",
+        "Maxilla + mandible (short feline rostrum)",
+        "Dental arcades",
         "Tympanic bullae superimposed at skull base",
-        "Globe outlines prominent in orbits",
+        "Orbital outlines",
       ],
       ddx: [],
       final_diagnosis:
-        "Feline lateral skull · brachycephalic conformation (no formal radiologist read for this anonymized case)",
+        "Feline lateral skull — anatomy reference (no formal radiologist read for this anonymized case; cephalic conformation not classified from one view)",
       teaching_points: [
-        "Brachycephalic breeds (Persian · Exotic Shorthair · Himalayan) over-represented for upper-airway / dental crowding pathology",
+        "Cephalic conformation (dolicho / meso / brachycephalic) is breed-dependent — classify by the cephalic index below, not by eye on a single view",
         "Lateral skull alone superimposes tympanic bullae — use DV or oblique views to separate L/R bullae",
         "Cephalic index (length / width) is the formal classification: brachy < 80, meso 80-90, dolicho > 90",
       ],
@@ -1195,17 +1179,17 @@ export const CASES: ImagingCase[] = [
   {
     id: "cuvet-canine-skull-lat-001-uuid-2026-05-26",
     slug: "cuvet-canine-skull-lat-001",
-    title: "Canine skull lateral · mesocephalic (CUVET)",
+    title: "Canine skull lateral (CUVET)",
     species: "canine",
-    signalment: "Dog · breed unknown (mesocephalic conformation) · CUVET teaching set",
+    signalment: "Dog · breed unknown · CUVET teaching set",
     history:
-      "Lateral skull from the CUVET teaching archive. Mesocephalic conformation — elongated muzzle, complete adult dental arcades. Useful contrast against feline brachycephalic skulls for breed-shape comparison.",
+      "Lateral skull from the CUVET teaching archive — elongated muzzle with complete adult dental arcades (longer-faced conformation). Useful contrast against the shorter-faced feline lateral skull for skull-shape comparison. (Specific cephalic class not asserted: breed unknown, single anonymized view.)",
     body_part: "skull",
     modality: "DX",
     difficulty: "intro",
     learning_objectives: [
-      "ระบุ mesocephalic conformation: elongated muzzle · full dental complement",
-      "เปรียบเทียบกับ /cases/cuvet-feline-skull-lat-001 (brachycephalic feline)",
+      "ระบุ canine skull landmarks: elongated muzzle · full adult dental arcade · tympanic bullae",
+      "เปรียบเทียบกับ /cases/cuvet-feline-skull-lat-001 (shorter-faced feline)",
       "อ่าน dental arcades: 42 adult teeth ทั้งหมด (3-1-4-2 / 3-1-4-3)",
       "ลอง 📏 Length tool: วัด muzzle vs cranium length (cephalic index)",
     ],
@@ -1224,7 +1208,7 @@ export const CASES: ImagingCase[] = [
       ],
       ddx: [],
       final_diagnosis:
-        "Canine lateral skull · mesocephalic conformation (no formal radiologist read for this anonymized case)",
+        "Canine lateral skull — anatomy reference (no formal radiologist read for this anonymized case; specific cephalic class not asserted from one view)",
       teaching_points: [
         "Adult canine dentition = 42 teeth (3-1-4-2 maxilla / 3-1-4-3 mandible · I-C-P-M)",
         "Dolichocephalic (Greyhound · Borzoi) breeds have longer muzzles — distinct from mesocephalic (Labrador · Mixed) by cephalic index",

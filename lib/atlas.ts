@@ -183,7 +183,7 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
     body_part: "thorax",
     view: "lateral",
     description:
-      "Feline thoracic radiograph in right-lateral recumbency. Compared with canine the cardiac silhouette is more elongated, vertebral heart score reference range differs (feline ~6.7–8.1 vs canine ~8.7–10.7).",
+      "Feline thoracic radiograph in right-lateral recumbency. Compared with canine the cardiac silhouette is more elongated, vertebral heart score reference range differs (feline ~6.7–8.1 vs canine ~8.5–10.5).",
     learning_landmarks: [
       "Cardiac silhouette (elongated)",
       "Tracheal column (more horizontal)",
@@ -280,12 +280,12 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
     body_part: "skull",
     view: "lateral",
     description:
-      "Feline lateral skull from the CUVET teaching set. Brachycephalic conformation — shortened muzzle, prominent globe outlines. Useful contrast against the dolichocephalic canine lateral for breed-shape comparison.",
+      "Feline lateral skull from the CUVET teaching set — rounded cranial vault and short rostrum typical of feline conformation. Useful contrast against the longer-muzzled canine lateral for skull-shape comparison. (Breed unknown; cephalic conformation not asserted from a single anonymized view.)",
     learning_landmarks: [
-      "Calvarium / cranial vault",
-      "Frontal sinus (small in brachycephalic cats)",
-      "Maxilla + mandible (shortened)",
-      "Dental arcades (compressed)",
+      "Calvarium / cranial vault (rounded)",
+      "Frontal sinus",
+      "Maxilla + mandible (short feline rostrum)",
+      "Dental arcades",
       "Tympanic bullae (superimposed)",
     ],
     image_path: "/atlas/cuvet-feline-skull-lat-001.png",
@@ -301,7 +301,7 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
     body_part: "skull",
     view: "lateral",
     description:
-      "Canine lateral skull from the CUVET teaching set. Mesocephalic conformation — elongated muzzle, complete adult dental arcades visible.",
+      "Canine lateral skull from the CUVET teaching set — elongated muzzle with complete adult dental arcades (longer-faced conformation). Breed unknown; specific cephalic class not asserted from a single anonymized view.",
     learning_landmarks: [
       "Calvarium / cranial vault",
       "Frontal sinus",
@@ -400,7 +400,7 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
     body_part: "spine",
     view: "VD",
     description:
-      "Canine thoraco-lumbar spine VD from the CUVET teaching set. Full thoracic + lumbar vertebral column with ribs symmetric on both sides — useful for screening alignment, intervertebral disc space uniformity, and vertebral body shape.",
+      "Canine VD spanning the thoracic vertebral column into the cranial lumbar (frame ends mid-lumbar), ribs symmetric on both sides — useful for screening vertebral alignment, intervertebral disc-space uniformity, and vertebral body shape across the thoracolumbar junction.",
     learning_landmarks: [
       "Thoracic vertebrae (T-row, ribs attached)",
       "Lumbar vertebrae (cranial portion visible)",
