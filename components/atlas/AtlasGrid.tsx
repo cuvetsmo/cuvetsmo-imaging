@@ -408,7 +408,7 @@ export function AtlasGrid({ entries }: { entries: AtlasEntry[] }) {
         <span className="text-[var(--color-text-muted)]">
           Coverage gaps we openly track:
         </span>{" "}
-        cervical spine (C1–C7), stifle (lateral) —
+        stifle (lateral) —
         unfilled until real images land.
         Trust the badge, not the filename.{" "}
         <a

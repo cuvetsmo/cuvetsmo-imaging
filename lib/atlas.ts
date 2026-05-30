@@ -15,10 +15,12 @@
 //
 // AI-generated tiles are NOT permitted. The "ai-generated" string is
 // not part of the Credibility union — TypeScript will refuse compile
-// if anyone tries to add one. Body-part gaps (no stifle / elbow /
-// cspine / canine-abdomen as of 2026-05-26) are disclosed in the
+// if anyone tries to add one. Body-part gaps are disclosed in the
 // honest footnote at /atlas instead of being filled with synthetic
-// images.
+// images. As of 2026-05-30 elbow, canine-abdomen and cervical spine
+// have been filled from CUVET teaching cases; stifle (lateral) is the
+// one remaining disclosed gap (the obvious candidate turned out to be
+// a metadata-labeled forelimb — see the Batch 04 note below).
 
 export type Modality = "DX" | "CR" | "CT" | "MR" | "US" | "RG";
 
@@ -512,6 +514,49 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
       "L anatomy marker (top-right)",
     ],
     image_path: "/atlas/cuvet-canine-thorax-vd-001.png",
+    license: "Educational use, CUVET-internal",
+    attribution: ATTR_CUVET_INTERNAL,
+    credibility: "cuvet-internal",
+  },
+  // ────────────────────────────────────────────────────────────────
+  // CUVET teaching cases — Batch 04 (1 entry · added 2026-05-30)
+  //
+  // Closes the "cervical spine (C1–C7)" gap the previous footnote
+  // disclosed. The source study is metadata-labeled "Chest" — it's a
+  // cervicothoracic lateral where the cervical column C1–C7 is clearly
+  // visible curving from the skull base into the cervicothoracic
+  // junction, so it's filed under spine with an honest description that
+  // names both regions in the field (not over-claimed as an isolated
+  // dedicated cervical series).
+  //
+  // Iron Rule 0 catch — the stifle trap, AGAIN: a portrait limb
+  // candidate (cell-0240) looked like a stifle lateral in the aspect-
+  // ratio montage, but its burned-in study label read "Forearm-bone"
+  // (antebrachium) and the proximal limb showed lung/thorax super-
+  // imposition — only possible when a FORELIMB is pulled across the
+  // chest, never in a stifle view. Rejected before any entry was
+  // written; the stifle-lateral gap stays openly disclosed. Same lesson
+  // as the cell-0083 elbow catch: trust the study label + super-
+  // imposition cues over aspect-ratio bucketing.
+  // ────────────────────────────────────────────────────────────────
+  {
+    id: "atlas-cuvet-013",
+    slug: "cuvet-canine-cspine-lat-001",
+    modality: "DX",
+    species: "canine",
+    body_part: "spine",
+    view: "lateral",
+    description:
+      "Canine cervicothoracic lateral from the CUVET teaching set (study labeled 'Chest'). The cervical vertebral column C1–C7 is clearly visible curving from the skull base through the cervicothoracic junction into the cranial thorax — a reference for counting cervical vertebrae and reading the normal cervical curvature. Anonymized via the CUVET 4-pass scrubber pipeline.",
+    learning_landmarks: [
+      "Cervical vertebrae C1 (atlas) → C7",
+      "Cervicothoracic junction (C7–T1)",
+      "Cranial thoracic vertebrae + ribs",
+      "Trachea (lucent column ventral to the spine)",
+      "Cardiac silhouette (cranial thorax)",
+      "< / > positioning markers (lateral edges)",
+    ],
+    image_path: "/atlas/cuvet-canine-cspine-lat-001.png",
     license: "Educational use, CUVET-internal",
     attribution: ATTR_CUVET_INTERNAL,
     credibility: "cuvet-internal",

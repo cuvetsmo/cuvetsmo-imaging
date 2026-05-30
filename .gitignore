@@ -63,3 +63,8 @@ SynapseExport*
 /playwright-report/
 /test-results/
 /.vitest-cache
+/.playwright-mcp/
+
+# Copyright deposit deliverable — generated artifact, submitted to DIP
+# separately. Contains source excerpts + screenshots; not repo source.
+*Copyright_Deposit.pdf

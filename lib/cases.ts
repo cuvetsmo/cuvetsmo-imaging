@@ -1360,4 +1360,47 @@ export const CASES: ImagingCase[] = [
       // ground_truth.vhs OMITTED — no published value for this case.
     },
   },
+  {
+    id: "cuvet-cspine-lat-001-uuid-2026-05-30",
+    slug: "cuvet-canine-cspine-lat-001",
+    title: "Canine cervical spine lateral (CUVET)",
+    species: "canine",
+    signalment: "Dog · breed unknown · CUVET teaching set",
+    history:
+      "Cervicothoracic lateral from the CUVET teaching archive (source study labeled 'Chest'). The cervical vertebral column C1–C7 is clearly visible curving from the skull base through the cervicothoracic junction into the cranial thorax — suited for cervical vertebra identification and intervertebral disc-space practice. Image anonymized via the CUVET 4-pass scrubber pipeline.",
+    body_part: "spine",
+    modality: "DX",
+    difficulty: "intermediate",
+    learning_objectives: [
+      "นับ + ระบุ cervical vertebrae C1 (atlas) → C7 ตาม ventral curve",
+      "ระบุ atlantoaxial region (C1–C2) ที่อยู่ใกล้ skull base",
+      "ลอง 📏 Length tool: วัด intervertebral disc spaces เทียบกันแต่ละช่อง",
+      "หา cervicothoracic junction (C7–T1) ที่ neck เปลี่ยนเป็น thorax",
+      "เปรียบเทียบกับ /cases/cuvet-canine-spine-tl-vd-001 (thoracolumbar spine view)",
+    ],
+    credibility: "cuvet-internal",
+    license: "Educational use, CUVET-internal · anonymized with Aj. approval",
+    source_url: "https://imaging.cuvetsmo.com/sources#cuvet-internal-teaching",
+    attribution: ATTR_CUVET_INTERNAL,
+    files: [{ view_name: "Lateral", path: "cuvet-canine-cspine-lat-001/LAT.dcm" }],
+    recall: {
+      findings: [
+        "Cervical vertebral bodies C1–C7 in a ventral curve",
+        "Atlas (C1) + axis (C2) near the skull base",
+        "Cervicothoracic junction (C7–T1)",
+        "Trachea as a lucent column ventral to the spine",
+        "Cranial thoracic vertebrae + ribs entering the field",
+      ],
+      ddx: [],
+      final_diagnosis:
+        "Canine cervicothoracic lateral — cervical spine anatomy + disc-space practice (no formal radiologist read for this anonymized case)",
+      teaching_points: [
+        "Cervical disc spaces are normally fairly uniform; a single narrowed space can be a Hansen type-II / IVDD signal — but confirm on a well-positioned, non-rotated lateral first",
+        "C1–C2 (atlantoaxial) is the site of AA instability, especially in toy breeds — flexed views assess it, but never force flexion in a suspected case",
+        "A true lateral superimposes the wings of the atlas + paired transverse processes; rotation mimics disease, so check positioning before reading any pathology",
+      ],
+      citation: ATTR_CUVET_INTERNAL,
+      // ground_truth OMITTED — anatomy reference, no measured value to score against.
+    },
+  },
 ];
