@@ -836,7 +836,7 @@ export const CASES: ImagingCase[] = [
         "Visually normal extended-leg pelvis (no formal radiologist read available for this anonymized teaching case — practice the measurement workflow, not the diagnosis)",
       teaching_points: [
         "Norberg angle measures coxofemoral subluxation severity — vertex at the femoral head, lines to centre + craniolateral acetabular rim",
-        "Reference cut-offs: ≥105° normal · 95–105° borderline · <95° dysplastic (Smith et al 1990 PennHIP-adjacent)",
+        "Norberg-angle cut-offs: ≥105° normal · 95–105° borderline · <95° subluxated (traditional Norberg angle, Norberg 1961 / FCI-OFA framework — NOT the same as PennHIP, which scores laxity by a distraction index, not an angle)",
         "Always measure BOTH hips and compare — asymmetry is a clinical flag even when individual angles look OK",
       ],
       citation: ATTR_CUVET_INTERNAL,
@@ -1171,7 +1171,7 @@ export const CASES: ImagingCase[] = [
       teaching_points: [
         "Cephalic conformation (dolicho / meso / brachycephalic) is breed-dependent — classify by the cephalic index below, not by eye on a single view",
         "Lateral skull alone superimposes tympanic bullae — use DV or oblique views to separate L/R bullae",
-        "Cephalic index (length / width) is the formal classification: brachy < 80, meso 80-90, dolicho > 90",
+        "Cephalic index (skull length vs width) is the quantitative way to classify conformation — but exact cut-offs vary by source, index definition, and species, so measure and compare rather than memorising one threshold",
       ],
       citation: ATTR_CUVET_INTERNAL,
     },
