@@ -408,8 +408,9 @@ export function AtlasGrid({ entries }: { entries: AtlasEntry[] }) {
         <span className="text-[var(--color-text-muted)]">
           Coverage gaps we openly track:
         </span>{" "}
-        a dedicated centred stifle (lateral) — it now appears within the
-        lateral hip view, but isn&apos;t isolated yet.
+        a confirmed-normal stifle (lateral) — an isolated stifle lateral
+        is now live as a post-operative case under Cases, but a
+        normal-anatomy reference is still pending.
         Trust the badge, not the filename.{" "}
         <a
           href="/sources"

@@ -1496,5 +1496,54 @@
       ],
       "citation": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission"
     }
+  },
+  {
+    "id": "cuvet-stifle-postop-001-uuid-2026-05-30",
+    "slug": "cuvet-canine-stifle-postop-001",
+    "title": "Canine stifle · post-operative, tibial implant (CUVET)",
+    "species": "canine",
+    "signalment": "Dog · ~16 kg · CUVET teaching set",
+    "history": "Post-operative canine stifle (study labeled 'KNEE JNT … CANINE'). The craniocaudal view shows a proximal tibial bone plate with cortical screws; the lateral view shows the femorotibial joint with patella and fabella and no implant in that projection. First hindlimb-stifle and first orthopedic-implant case in the catalog. Images anonymized via the CUVET 4-pass scrubber pipeline.",
+    "body_part": "limb-hind",
+    "modality": "DX",
+    "difficulty": "advanced",
+    "learning_objectives": [
+      "ระบุ orthopedic implant: proximal tibial plate + cortical screws บน CrCd view",
+      "ระบุ stifle landmarks บน lateral: patella · fabella · femoral condyles · tibial plateau · tibial tuberosity",
+      "เข้าใจว่าทำไม implant ต้องดู ≥2 views (CrCd เห็น plate ชัด · lateral อาจไม่เห็น)",
+      "ลอง 📏 Length / 📐 Angle tools รอบ joint + implant",
+      "เทียบ projection: CrCd vs lateral ของ stifle เดียวกัน"
+    ],
+    "credibility": "cuvet-internal",
+    "license": "Educational use, CUVET-internal · anonymized with Aj. approval",
+    "source_url": "https://imaging.cuvetsmo.com/sources#cuvet-internal-teaching",
+    "attribution": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission",
+    "files": [
+      {
+        "view_name": "Lateral",
+        "path": "cuvet-canine-stifle-postop-001/LAT.dcm"
+      },
+      {
+        "view_name": "CrCd",
+        "path": "cuvet-canine-stifle-postop-001/CrCd.dcm"
+      }
+    ],
+    "recall": {
+      "findings": [
+        "CrCd: proximal tibial bone plate fixed with cortical screws",
+        "CrCd: femorotibial joint + crus + tarsus in the same projection",
+        "Lateral: patella (cranial sesamoid) + fabella (caudal sesamoid)",
+        "Lateral: femoral condyles, femorotibial joint space, tibial plateau",
+        "Lateral: implant not profiled in this projection"
+      ],
+      "ddx": [],
+      "final_diagnosis": "Post-operative canine stifle with a proximal tibial implant — orthopedic teaching case (no formal radiologist read for this anonymized case; identify the hardware + landmarks, do not assume the indication)",
+      "teaching_points": [
+        "A proximal tibial plate has several common indications (e.g. TPLO for cranial-cruciate disease, or tibial fracture repair) — the exact procedure is NOT inferable from a single anonymized study without the record",
+        "Implant + fracture/osteotomy assessment ALWAYS needs orthogonal views — a plate obvious on CrCd can sit out of profile on the lateral",
+        "Patella + fabellae are the lateral-stifle anchors; loss of the fabellae or a displaced patella changes the whole interpretation"
+      ],
+      "citation": "Courtesy of Small Animal Hospital of Chulalongkorn University · DI Unit · anonymized for veterinary education with permission"
+    }
   }
 ]
