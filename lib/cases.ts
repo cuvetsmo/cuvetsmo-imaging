@@ -1403,4 +1403,50 @@ export const CASES: ImagingCase[] = [
       // ground_truth OMITTED — anatomy reference, no measured value to score against.
     },
   },
+  {
+    id: "cuvet-pelvis-lat-vd-001-uuid-2026-05-30",
+    slug: "cuvet-canine-pelvis-lat-001",
+    title: "Canine pelvis · lateral + VD (CUVET)",
+    species: "canine",
+    signalment: "Dog · breed unknown · CUVET teaching set",
+    history:
+      "Two-view pelvis study from the CUVET teaching archive (study labeled 'Hip-joint'): a lateral pelvic-limb projection (hip + femur + stifle) paired with an extended-leg VD pelvis (both coxofemoral joints + femora). Suited for paired-view hip evaluation and practising the Norberg-angle workflow on the VD. Images anonymized via the CUVET 4-pass scrubber pipeline.",
+    body_part: "pelvis",
+    modality: "DX",
+    difficulty: "intermediate",
+    learning_objectives: [
+      "ฝึก paired-view hip eval: lateral + VD ของ pelvis เดียวกัน",
+      "ระบุ landmarks: femoral head · acetabulum · greater trochanter · stifle (ใน lateral view)",
+      "ลอง 📐 Norberg workflow บน VD (วาง vertices ที่ femoral heads + dorsal acetabular rims) — ฝึก workflow เท่านั้น, ค่าจริงรอ radiologist read",
+      "เทียบ symmetry ของ coxofemoral joints ซ้าย-ขวา บน VD",
+      "เปรียบเทียบกับ /cases/cuvet-canine-pelvis-vd-001 (Norberg practice case)",
+    ],
+    credibility: "cuvet-internal",
+    license: "Educational use, CUVET-internal · anonymized with Aj. approval",
+    source_url: "https://imaging.cuvetsmo.com/sources#cuvet-internal-teaching",
+    attribution: ATTR_CUVET_INTERNAL,
+    files: [
+      { view_name: "Lateral", path: "cuvet-canine-pelvis-lat-001/LAT.dcm" },
+      { view_name: "VD", path: "cuvet-canine-pelvis-lat-001/VD.dcm" },
+    ],
+    recall: {
+      findings: [
+        "Lateral: hip joint, femur, and stifle in one pelvic-limb projection",
+        "VD: both coxofemoral joints (femoral head + acetabulum), symmetric",
+        "VD: both femora with long axis visible",
+        "Lumbosacral junction cranial to the pelvis",
+        "L positioning marker present",
+      ],
+      ddx: [],
+      final_diagnosis:
+        "Canine 2-view pelvis (lateral + VD) — paired-view anatomy + Norberg workflow practice (no formal radiologist read for this anonymized case)",
+      teaching_points: [
+        "Norberg angle is measured on the extended-leg VD — never the lateral; the lateral gives sacroiliac / luxation context",
+        "A symmetric, well-positioned VD is mandatory before reading hip laxity — pelvic tilt mimics subluxation",
+        "Coxofemoral OA signs (osteophytes, remodelled femoral head, shallow acetabulum) need both views to characterise",
+      ],
+      citation: ATTR_CUVET_INTERNAL,
+      // ground_truth.norberg OMITTED — no radiologist-measured angle; Aj.-approved USE ≠ a measured VALUE (Iron Rule 0).
+    },
+  },
 ];

@@ -561,6 +561,40 @@ export const ATLAS_ENTRIES: AtlasEntry[] = [
     attribution: ATTR_CUVET_INTERNAL,
     credibility: "cuvet-internal",
   },
+  // ────────────────────────────────────────────────────────────────
+  // CUVET teaching cases — Batch 05 (1 entry · added 2026-05-30)
+  //
+  // First LATERAL pelvis view in the atlas (previously only VD pelvis).
+  // Source study is metadata-labeled "Hip-joint" — verified by reading
+  // the burned-in study banner before classifying, per the forelimb-
+  // trap lesson. Shows hip joint + femur + stifle + proximal tibia in
+  // one lateral pelvic-limb projection, so it also gives the first
+  // lateral look at the stifle the footnote had been tracking (still
+  // not an isolated/centred stifle projection — footnote reworded, not
+  // cleared).
+  // ────────────────────────────────────────────────────────────────
+  {
+    id: "atlas-cuvet-014",
+    slug: "cuvet-canine-pelvis-lat-001",
+    modality: "DX",
+    species: "canine",
+    body_part: "pelvis",
+    view: "lateral",
+    description:
+      "Canine lateral pelvis / pelvic limb from the CUVET teaching set (study labeled 'Hip-joint'). Hip joint, femur, stifle, and proximal tibia are visible in one lateral projection — the first lateral pelvis in the atlas to pair with the VD pelvis views, and the first lateral look at the stifle. Anonymized via the CUVET 4-pass scrubber pipeline.",
+    learning_landmarks: [
+      "Hip joint (femoral head in acetabulum)",
+      "Lumbosacral junction (cranial to the pelvis)",
+      "Femur (greater trochanter → distal condyles)",
+      "Stifle joint (femorotibial, distal)",
+      "Tibia (proximal)",
+      "L positioning marker",
+    ],
+    image_path: "/atlas/cuvet-canine-pelvis-lat-001.png",
+    license: "Educational use, CUVET-internal",
+    attribution: ATTR_CUVET_INTERNAL,
+    credibility: "cuvet-internal",
+  },
 ];
 
 // Helper — lookup by slug. Used by /atlas/[slug] detail route.
