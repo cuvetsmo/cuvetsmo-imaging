@@ -1479,4 +1479,88 @@ export const CASES: ImagingCase[] = [
       // ground_truth OMITTED — post-operative case, no radiologist read; we describe the hardware, never grade it.
     },
   },
+  {
+    id: "cuvet-stifle-pin-001-uuid-2026-05-31",
+    slug: "cuvet-canine-stifle-pin-001",
+    title: "Canine stifle · post-operative, cross-pin fixation (CUVET)",
+    species: "canine",
+    signalment: "Dog · ~8 kg · CUVET teaching set",
+    history:
+      "Post-operative canine stifle (study labeled 'KNEE JNT … CANINE'). Lateral projection showing two crossed pins (K-wires) fixing the proximal tibia just distal to the femorotibial joint, with the stifle, crus, tarsus and pes in the field. A different fixation technique from the plated post-op stifle (cuvet-canine-stifle-postop-001) — useful side-by-side for implant recognition. Image anonymized via the CUVET 4-pass scrubber pipeline.",
+    body_part: "limb-hind",
+    modality: "DX",
+    difficulty: "advanced",
+    learning_objectives: [
+      "ระบุ orthopedic implant: cross-pins (K-wires) ที่ proximal tibia",
+      "เทียบ fixation: cross-pin (เคสนี้) vs plate (/cases/cuvet-canine-stifle-postop-001)",
+      "ระบุ stifle landmarks รอบ implant: patella · fabella · femoral condyles · tibial plateau",
+      "ลอง 📏 / 📐 tools รอบ joint + pin tracks",
+      "เข้าใจว่า implant ควรดู ≥2 views — เคสนี้มี lateral เดียว",
+    ],
+    credibility: "cuvet-internal",
+    license: "Educational use, CUVET-internal · anonymized with Aj. approval",
+    source_url: "https://imaging.cuvetsmo.com/sources#cuvet-internal-teaching",
+    attribution: ATTR_CUVET_INTERNAL,
+    files: [{ view_name: "Lateral", path: "cuvet-canine-stifle-pin-001/LAT.dcm" }],
+    recall: {
+      findings: [
+        "Two crossed pins (K-wires) in the proximal tibia",
+        "Femorotibial (stifle) joint with patella + fabella",
+        "Crus (tibia/fibula), tarsus and pes in the field",
+        "Lateral projection — implant seen in one plane only",
+      ],
+      ddx: [],
+      final_diagnosis:
+        "Post-operative canine stifle with cross-pin fixation — orthopedic teaching case (no formal radiologist read for this anonymized case; identify the implant + landmarks, do not assume the indication)",
+      teaching_points: [
+        "Cross-pin / K-wire fixation and bone-plate fixation address different problems — compare with the plated post-op stifle in the catalog",
+        "Pins can migrate — follow-up films check pin position; a single view can hide migration out of plane",
+        "Never infer the original injury from hardware alone — the record, not the radiograph, gives the indication",
+      ],
+      citation: ATTR_CUVET_INTERNAL,
+      // ground_truth OMITTED — post-op, no radiologist read; describe the hardware, never grade it.
+    },
+  },
+  {
+    id: "cuvet-feline-forelimb-lat-001-uuid-2026-05-31",
+    slug: "cuvet-feline-forelimb-lat-001",
+    title: "Feline forelimb · post-operative antebrachial plate (CUVET)",
+    species: "feline",
+    signalment: "Cat · ~4 kg · CUVET teaching set",
+    history:
+      "Post-operative feline forelimb (study labeled 'FO.ARM … FELINE -4KG'). Lateral projection: humerus, elbow, antebrachium (radius + ulna) carrying a bone plate with cortical screws, then carpus and manus. First feline LIMB in the catalog (previously feline skull + thorax only). Image anonymized via the CUVET 4-pass scrubber pipeline.",
+    body_part: "limb-fore",
+    modality: "DX",
+    difficulty: "advanced",
+    learning_objectives: [
+      "ระบุ feline forelimb landmarks: humerus · elbow · radius/ulna · carpus · manus",
+      "ระบุ orthopedic implant: antebrachial bone plate + cortical screws",
+      "เทียบ feline forelimb proportions กับ canine (/cases/cuvet-canine-forelimb-lat-001)",
+      "ลอง 📏 Length tool: วัด plate span เทียบ bone length",
+      "เข้าใจ implant assessment ควร ≥2 views — เคสนี้มี lateral เดียว",
+    ],
+    credibility: "cuvet-internal",
+    license: "Educational use, CUVET-internal · anonymized with Aj. approval",
+    source_url: "https://imaging.cuvetsmo.com/sources#cuvet-internal-teaching",
+    attribution: ATTR_CUVET_INTERNAL,
+    files: [{ view_name: "Lateral", path: "cuvet-feline-forelimb-lat-001/LAT.dcm" }],
+    recall: {
+      findings: [
+        "Bone plate + cortical screws on the antebrachium (radius)",
+        "Humerus, elbow, radius/ulna, carpus and manus traceable",
+        "Slender feline-proportioned forelimb (~4 kg cat)",
+        "Lateral projection — implant in one plane only",
+      ],
+      ddx: [],
+      final_diagnosis:
+        "Post-operative feline antebrachial fracture repair (plate) — orthopedic teaching case (no formal radiologist read for this anonymized case; species per the burned-in study label 'FELINE -4KG'; identify the implant + landmarks, do not assume the indication)",
+      teaching_points: [
+        "Feline long bones are slender with thin cortices — plate/screw sizing differs from canine",
+        "Antebrachial plates most often sit on the radius; the ulna may be left to heal alongside",
+        "Implant + healing assessment needs orthogonal views — this case shows one lateral only",
+      ],
+      citation: ATTR_CUVET_INTERNAL,
+      // ground_truth OMITTED — post-op, no radiologist read; species per the burned-in study label.
+    },
+  },
 ];
