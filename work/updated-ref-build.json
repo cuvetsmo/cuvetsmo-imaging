@@ -1,0 +1,116 @@
+{
+  "captured_at": "2026-10-06T12:29:06.614Z",
+  "passed": true,
+  "artifact": "new production build after canonical ref selector patch",
+  "rows": [
+    {
+      "surface": "imaging",
+      "query": "kind=atlas&ref=canine-thorax-lat-001",
+      "status": 200,
+      "ref": "canine-thorax-lat-001",
+      "error": null,
+      "cors": "https://ai.cuvetsmo.com",
+      "data_revision": "ab49a30"
+    },
+    {
+      "surface": "imaging",
+      "query": "kind=atlas&id=canine-thorax-lat-001",
+      "status": 200,
+      "ref": "canine-thorax-lat-001",
+      "error": null,
+      "cors": "https://ai.cuvetsmo.com",
+      "data_revision": "ab49a30"
+    },
+    {
+      "surface": "imaging",
+      "query": "kind=atlas&ref=canine-thorax-lat-001&id=canine-thorax-lat-001",
+      "status": 200,
+      "ref": "canine-thorax-lat-001",
+      "error": null,
+      "cors": "https://ai.cuvetsmo.com",
+      "data_revision": "ab49a30"
+    },
+    {
+      "surface": "imaging",
+      "query": "kind=atlas&ref=canine-thorax-lat-001&id=conflict",
+      "status": 400,
+      "ref": null,
+      "error": "conflicting_selector",
+      "cors": "https://ai.cuvetsmo.com",
+      "data_revision": null
+    },
+    {
+      "surface": "imaging",
+      "query": "kind=atlas&ref=canine-thorax-lat-001&ref=canine-thorax-lat-001",
+      "status": 400,
+      "ref": null,
+      "error": "conflicting_selector",
+      "cors": "https://ai.cuvetsmo.com",
+      "data_revision": null
+    },
+    {
+      "surface": "imaging",
+      "query": "kind=atlas&ref=canine-thorax-lat-001",
+      "status": 403,
+      "ref": null,
+      "error": "origin_not_allowed",
+      "cors": null,
+      "data_revision": null
+    },
+    {
+      "surface": "web3",
+      "query": "kind=lesson&ref=3",
+      "status": 200,
+      "ref": "3",
+      "error": null,
+      "cors": "https://ai.cuvetsmo.com",
+      "data_revision": "49a3e98"
+    },
+    {
+      "surface": "web3",
+      "query": "kind=lesson&id=3",
+      "status": 200,
+      "ref": "3",
+      "error": null,
+      "cors": "https://ai.cuvetsmo.com",
+      "data_revision": "49a3e98"
+    },
+    {
+      "surface": "web3",
+      "query": "kind=lesson&ref=3&id=3",
+      "status": 200,
+      "ref": "3",
+      "error": null,
+      "cors": "https://ai.cuvetsmo.com",
+      "data_revision": "49a3e98"
+    },
+    {
+      "surface": "web3",
+      "query": "kind=lesson&ref=3&id=conflict",
+      "status": 400,
+      "ref": null,
+      "error": "conflicting_selector",
+      "cors": "https://ai.cuvetsmo.com",
+      "data_revision": null
+    },
+    {
+      "surface": "web3",
+      "query": "kind=lesson&ref=3&ref=3",
+      "status": 400,
+      "ref": null,
+      "error": "conflicting_selector",
+      "cors": "https://ai.cuvetsmo.com",
+      "data_revision": null
+    },
+    {
+      "surface": "web3",
+      "query": "kind=lesson&ref=3",
+      "status": 403,
+      "ref": null,
+      "error": "origin_not_allowed",
+      "cors": null,
+      "data_revision": null
+    }
+  ],
+  "external_calls": false
+}

@@ -10,6 +10,7 @@ import {
   lazy,
 } from 'react';
 import Link from 'next/link';
+import AtheneStudyHandoff from '@/components/athene-study-handoff';
 import type { ImagingCase } from '@/lib/cases';
 import { ATLAS_ENTRIES } from '@/lib/atlas';
 import { RecallInputCard } from './RecallInputCard';
@@ -596,6 +597,8 @@ export function CaseDetailView({ caseId }: { caseId: string }) {
           </section>
         );
       })()}
+
+      {mode === 'revealed' && <AtheneStudyHandoff kind="case" reference={caseMeta.slug} />}
 
       {caseMeta && catalog.length > 0 && (
         <RelatedCases

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import AtheneStudyHandoff from '@/components/athene-study-handoff';
 import {
   type AtlasEntry,
   BODY_PART_LABELS,
@@ -99,6 +100,8 @@ export function AtlasDetail({
           </div>
         </div>
       </figure>
+
+      <AtheneStudyHandoff kind="atlas" reference={entry.slug} />
 
       {/* Description */}
       <section className="mb-6">

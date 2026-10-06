@@ -1,0 +1,15 @@
+{
+  "captured_at": "2026-10-06T12:19:11.6998054Z",
+  "selector": "canonical ref; exact backward id alias; conflicting/duplicate selectors refused",
+  "checks": "existing route-function contract check passed after patch; whole frontend build not repeated",
+  "files": [
+    {
+      "File": "app/api/athene-context/route.ts",
+      "SHA256": "CAE0D0A717D1DD8CF5377E20A9FEDE20FF8E4402119E8A7793DD4A3490548129"
+    },
+    {
+      "File": "scripts/athene-context-check.mjs",
+      "SHA256": "D973937FAC7418975AAB874C48444BD92B4CEB084AA51946D6054BD141A44AAA"
+    }
+  ]
+}
